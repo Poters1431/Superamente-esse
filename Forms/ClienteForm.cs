@@ -27,81 +27,115 @@ public class ClienteForm : Form
     {
         Text = _cliente is null ? "Novo Cliente" : "Editar Cliente";
         StartPosition = FormStartPosition.CenterParent;
-        ClientSize = new Size(460, 520);
+        ClientSize = new Size(480, 620);
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = false;
         BackColor = UITheme.Background;
+        Padding = new Padding(16);
 
         var card = UITheme.CriarCard();
-        card.SetBounds(20, 20, 420, 480);
+        card.Dock = DockStyle.Fill;
 
-        int x = 24, w = 372, y = 20;
-
-        void AddCampo(string rotulo, Control controle, int altura = 28)
+        var tabela = new TableLayoutPanel
         {
-            var lbl = UITheme.CriarLabel(rotulo);
-            lbl.Location = new Point(x, y);
-            card.Controls.Add(lbl);
-            y += 22;
-            controle.SetBounds(x, y, w, altura);
-            card.Controls.Add(controle);
-            y += altura + 14;
+            Dock = DockStyle.Fill,
+            ColumnCount = 1
+        };
+        tabela.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+
+        Label Rotulo(string texto) => new()
+        {
+            Text = texto,
+            Font = UITheme.FontPequena,
+            ForeColor = UITheme.Text,
+            Dock = DockStyle.Fill,
+            TextAlign = ContentAlignment.BottomLeft
+        };
+
+        void Linha(Control rotulo, Control campo, float alturaCampo = 30f)
+        {
+            tabela.RowStyles.Add(new RowStyle(SizeType.Absolute, 20f));
+            tabela.Controls.Add(rotulo);
+            tabela.RowStyles.Add(new RowStyle(SizeType.Absolute, alturaCampo));
+            tabela.Controls.Add(campo);
         }
 
-        var lblTitulo = UITheme.CriarLabel(_cliente is null ? "➕ Novo Cliente" : "✏ Editar Cliente", true, UITheme.Primary);
-        lblTitulo.Font = new Font("Segoe UI", 14f, FontStyle.Bold);
-        lblTitulo.Location = new Point(x, y);
-        card.Controls.Add(lblTitulo);
-        y += 40;
+        // Título
+        tabela.RowStyles.Add(new RowStyle(SizeType.Absolute, 40f));
+        tabela.Controls.Add(new Label
+        {
+            Text = _cliente is null ? "➕ Novo Cliente" : "✏ Editar Cliente",
+            Font = new Font("Segoe UI", 14f, FontStyle.Bold),
+            ForeColor = UITheme.Primary,
+            Dock = DockStyle.Fill
+        });
 
         txtNome = UITheme.CriarTextBox("Nome completo");
-        AddCampo("Nome *", txtNome);
-
         txtCpf = UITheme.CriarTextBox("Somente números");
-        AddCampo("CPF *", txtCpf);
-
         txtTelefone = UITheme.CriarTextBox("(00) 00000-0000");
-        AddCampo("Telefone", txtTelefone);
-
         txtEmail = UITheme.CriarTextBox("email@exemplo.com");
-        AddCampo("E-mail", txtEmail);
+        txtEndereco = UITheme.CriarTextBox("Rua, número, bairro, cidade...");
+        foreach (var t in new[] { txtNome, txtCpf, txtTelefone, txtEmail, txtEndereco })
+            t.Dock = DockStyle.Fill;
 
         dtpNascimento = new DateTimePicker
         {
             Font = UITheme.FontNormal,
             Format = DateTimePickerFormat.Short,
             MinDate = new DateTime(1900, 1, 1),
-            MaxDate = DateTime.Today
+            MaxDate = DateTime.Today,
+            Dock = DockStyle.Fill
         };
-        AddCampo("Data de nascimento", dtpNascimento);
 
         chkSemNascimento = new CheckBox
         {
             Text = "Não informar data de nascimento",
             Font = UITheme.FontPequena,
             ForeColor = UITheme.TextMuted,
-            AutoSize = true,
-            Location = new Point(x, y)
+            Dock = DockStyle.Fill
         };
         chkSemNascimento.CheckedChanged += (_, _) => dtpNascimento.Enabled = !chkSemNascimento.Checked;
-        card.Controls.Add(chkSemNascimento);
-        y += 30;
 
-        txtEndereco = UITheme.CriarTextBox("Rua, número, bairro, cidade...");
-        AddCampo("Endereço", txtEndereco, 40);
+        Linha(Rotulo("Nome *"), txtNome);
+        Linha(Rotulo("CPF *"), txtCpf);
+        Linha(Rotulo("Telefone"), txtTelefone);
+        Linha(Rotulo("E-mail"), txtEmail);
+        Linha(Rotulo("Data de nascimento"), dtpNascimento);
 
+        tabela.RowStyles.Add(new RowStyle(SizeType.Absolute, 26f));
+        tabela.Controls.Add(chkSemNascimento);
+
+        Linha(Rotulo("Endereço"), txtEndereco, 32f);
+
+        // Espaço flexível + linha de botões (sempre visível)
+        tabela.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+        tabela.Controls.Add(new Panel());
+
+        var painelBotoes = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            FlowDirection = FlowDirection.RightToLeft,
+            WrapContents = false
+        };
         btnSalvar = UITheme.CriarBotao("💾 Salvar");
-        btnSalvar.SetBounds(x, 420, 180, 40);
+        btnSalvar.Width = 150;
         btnSalvar.Click += BtnSalvar_Click;
-
         btnCancelar = UITheme.CriarBotao("Cancelar", UITheme.TextMuted, true);
-        btnCancelar.SetBounds(x + 192, 420, 180, 40);
+        btnCancelar.Width = 130;
         btnCancelar.Click += (_, _) => { DialogResult = DialogResult.Cancel; Close(); };
+        painelBotoes.Controls.Add(btnSalvar);
+        painelBotoes.Controls.Add(btnCancelar);
 
-        card.Controls.Add(btnSalvar);
-        card.Controls.Add(btnCancelar);
+        tabela.RowStyles.Add(new RowStyle(SizeType.Absolute, 48f));
+        tabela.Controls.Add(painelBotoes);
+
+        tabela.RowCount = tabela.RowStyles.Count;
+        card.Controls.Add(tabela);
         Controls.Add(card);
+
+        AcceptButton = btnSalvar;
+        CancelButton = btnCancelar;
     }
 
     private void Preencher(Cliente c)
