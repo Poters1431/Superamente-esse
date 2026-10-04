@@ -17,6 +17,7 @@ public class PagamentoForm : Form
     private DateTimePicker dtpVencimento = null!, dtpPagamento = null!;
     private CheckBox chkPago = null!;
     private Label lblResumoCliente = null!;
+    private Button btnSalvar = null!, btnCancelar = null!;
 
     public PagamentoForm(PagamentoService service, Usuario usuario,
         List<Cliente> clientes, List<FormaPagamento> formas, Pagamento? pagamento)
@@ -33,115 +34,157 @@ public class PagamentoForm : Form
     {
         Text = _pagamento is null ? "Registrar Pagamento" : "Editar Pagamento";
         StartPosition = FormStartPosition.CenterParent;
-        ClientSize = new Size(480, 620);
+        ClientSize = new Size(500, 700);
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = false;
         BackColor = UITheme.Background;
+        Padding = new Padding(16);
 
         var card = UITheme.CriarCard();
-        card.SetBounds(20, 20, 440, 580);
+        card.Dock = DockStyle.Fill;
 
-        int x = 24, w = 392, y = 20;
-
-        void AddCampo(string rotulo, Control controle, int altura = 30)
+        var tabela = new TableLayoutPanel
         {
-            var lbl = UITheme.CriarLabel(rotulo);
-            lbl.Location = new Point(x, y);
-            lbl.Font = UITheme.FontPequena;
-            card.Controls.Add(lbl);
-            y += 20;
-            controle.SetBounds(x, y, w, altura);
-            card.Controls.Add(controle);
-            y += altura + 10;
+            Dock = DockStyle.Fill,
+            ColumnCount = 1
+        };
+        tabela.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+
+        Label Rotulo(string texto) => new()
+        {
+            Text = texto,
+            Font = UITheme.FontPequena,
+            ForeColor = UITheme.Text,
+            Dock = DockStyle.Fill,
+            TextAlign = ContentAlignment.BottomLeft
+        };
+
+        void Linha(Control rotulo, Control campo, float alturaCampo = 30f)
+        {
+            tabela.RowStyles.Add(new RowStyle(SizeType.Absolute, 20f));
+            tabela.Controls.Add(rotulo);
+            tabela.RowStyles.Add(new RowStyle(SizeType.Absolute, alturaCampo));
+            tabela.Controls.Add(campo);
         }
 
-        var lblTitulo = UITheme.CriarLabel(
-            _pagamento is null ? "➕ Registrar Pagamento" : "✏ Editar Pagamento", true, UITheme.Primary);
-        lblTitulo.Font = new Font("Segoe UI", 14f, FontStyle.Bold);
-        lblTitulo.Location = new Point(x, y);
-        card.Controls.Add(lblTitulo);
-        y += 36;
+        // Título
+        tabela.RowStyles.Add(new RowStyle(SizeType.Absolute, 40f));
+        tabela.Controls.Add(new Label
+        {
+            Text = _pagamento is null ? "➕ Registrar Pagamento" : "✏ Editar Pagamento",
+            Font = new Font("Segoe UI", 14f, FontStyle.Bold),
+            ForeColor = UITheme.Primary,
+            Dock = DockStyle.Fill
+        });
 
         // Cliente
         cmbCliente = UITheme.CriarComboBox();
         cmbCliente.DataSource = clientes;
+        cmbCliente.Dock = DockStyle.Fill;
         cmbCliente.SelectedIndexChanged += (_, _) => AtualizarResumoCliente();
-        AddCampo("Cliente *", cmbCliente);
+        Linha(Rotulo("Cliente *"), cmbCliente);
 
+        // Resumo financeiro do cliente
         lblResumoCliente = new Label
         {
             Font = UITheme.FontPequena,
             ForeColor = UITheme.TextMuted,
-            AutoSize = false,
-            Bounds = new Rectangle(x, y, w, 34)
+            Dock = DockStyle.Fill
         };
-        card.Controls.Add(lblResumoCliente);
-        y += 42;
+        tabela.RowStyles.Add(new RowStyle(SizeType.Absolute, 34f));
+        tabela.Controls.Add(lblResumoCliente);
 
         // Valor
         txtValor = UITheme.CriarTextBox("0,00");
         txtValor.TextAlign = HorizontalAlignment.Right;
-        AddCampo("Valor (R$) *", txtValor);
+        txtValor.Dock = DockStyle.Fill;
+        Linha(Rotulo("Valor (R$) *"), txtValor);
 
         // Vencimento
-        dtpVencimento = new DateTimePicker { Font = UITheme.FontNormal, Format = DateTimePickerFormat.Short };
-        AddCampo("Data de vencimento *", dtpVencimento);
+        dtpVencimento = new DateTimePicker
+        {
+            Font = UITheme.FontNormal,
+            Format = DateTimePickerFormat.Short,
+            Dock = DockStyle.Fill
+        };
+        Linha(Rotulo("Data de vencimento *"), dtpVencimento);
 
         // Status
         cmbStatus = UITheme.CriarComboBox();
         cmbStatus.Items.AddRange(new object[] { "Pendente", "Pago", "Atrasado" });
         cmbStatus.SelectedIndex = 0;
+        cmbStatus.Dock = DockStyle.Fill;
         cmbStatus.SelectedIndexChanged += (_, _) => AtualizarDataPagamento();
-        AddCampo("Status *", cmbStatus);
+        Linha(Rotulo("Status *"), cmbStatus);
 
-        // Pago + data
+        // Checkbox pago
         chkPago = new CheckBox
         {
             Text = "Foi pago (informar data do pagamento)",
-            Font = UITheme.FontNormal,
+            Font = UITheme.FontPequena,
             ForeColor = UITheme.Text,
-            AutoSize = true,
-            Location = new Point(x, y)
+            Dock = DockStyle.Fill
         };
         chkPago.CheckedChanged += (_, _) =>
         {
             dtpPagamento.Enabled = chkPago.Checked;
             if (chkPago.Checked) cmbStatus.SelectedItem = "Pago";
         };
-        card.Controls.Add(chkPago);
-        y += 28;
+        tabela.RowStyles.Add(new RowStyle(SizeType.Absolute, 26f));
+        tabela.Controls.Add(chkPago);
 
+        // Data do pagamento
         dtpPagamento = new DateTimePicker
         {
             Font = UITheme.FontNormal,
             Format = DateTimePickerFormat.Short,
-            Enabled = false
+            Enabled = false,
+            Dock = DockStyle.Fill
         };
-        AddCampo("Data do pagamento", dtpPagamento);
+        Linha(Rotulo("Data do pagamento"), dtpPagamento);
 
         // Forma de pagamento
         cmbForma = UITheme.CriarComboBox();
         cmbForma.DataSource = formas;
-        AddCampo("Forma de pagamento *", cmbForma);
+        cmbForma.Dock = DockStyle.Fill;
+        Linha(Rotulo("Forma de pagamento *"), cmbForma);
 
         // Observação
         txtObservacao = UITheme.CriarTextBox("Observações (opcional)");
         txtObservacao.Multiline = true;
         txtObservacao.ScrollBars = ScrollBars.Vertical;
-        AddCampo("Observação", txtObservacao, 60);
+        txtObservacao.Dock = DockStyle.Fill;
+        Linha(Rotulo("Observação"), txtObservacao, 56f);
 
-        var btnSalvar = UITheme.CriarBotao("💾 Salvar");
-        btnSalvar.SetBounds(x, 520, 190, 40);
+        // Espaço flexível + botões sempre visíveis
+        tabela.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+        tabela.Controls.Add(new Panel());
+
+        var painelBotoes = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            FlowDirection = FlowDirection.RightToLeft,
+            WrapContents = false
+        };
+        btnSalvar = UITheme.CriarBotao("💾 Salvar");
+        btnSalvar.Width = 160;
         btnSalvar.Click += BtnSalvar_Click;
-
-        var btnCancelar = UITheme.CriarBotao("Cancelar", UITheme.TextMuted, true);
-        btnCancelar.SetBounds(x + 202, 520, 190, 40);
+        btnCancelar = UITheme.CriarBotao("Cancelar", UITheme.TextMuted, true);
+        btnCancelar.Width = 140;
         btnCancelar.Click += (_, _) => { DialogResult = DialogResult.Cancel; Close(); };
+        painelBotoes.Controls.Add(btnSalvar);
+        painelBotoes.Controls.Add(btnCancelar);
 
-        card.Controls.Add(btnSalvar);
-        card.Controls.Add(btnCancelar);
+        tabela.RowStyles.Add(new RowStyle(SizeType.Absolute, 48f));
+        tabela.Controls.Add(painelBotoes);
+
+        tabela.RowCount = tabela.RowStyles.Count;
+        card.Controls.Add(tabela);
         Controls.Add(card);
+
+        AcceptButton = btnSalvar;
+        CancelButton = btnCancelar;
 
         AtualizarDataPagamento();
         AtualizarResumoCliente();
@@ -165,7 +208,7 @@ public class PagamentoForm : Form
         {
             var r = _service.ObterResumoCliente(cliente.Id);
             lblResumoCliente.Text = r.QuantidadeParcelas == 0
-                ? $"Cliente sem pagamentos registrados."
+                ? "Cliente sem pagamentos registrados."
                 : $"Total: {r.ValorTotal:C2} · Parcelas: {r.ParcelasPagas}/{r.QuantidadeParcelas} pagas · " +
                   $"Pago: {r.TotalPago:C2} · Restante: {r.ValorRestante:C2} · {r.Status}";
         }
