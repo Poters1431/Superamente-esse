@@ -8,12 +8,16 @@ namespace ClientePagamentoSystem.Forms;
 public class ClienteForm : Form
 {
     private readonly ClienteService _service;
+    private readonly CepService _cepService = new();
     private readonly Cliente? _cliente;
 
-    private TextBox txtNome = null!, txtCpf = null!, txtTelefone = null!, txtEmail = null!, txtEndereco = null!;
+    private TextBox txtNome = null!, txtCpf = null!, txtTelefone = null!, txtEmail = null!;
+    private TextBox txtCep = null!, txtRua = null!, txtComplemento = null!;
     private DateTimePicker dtpNascimento = null!;
     private CheckBox chkSemNascimento = null!;
+    private Label lblCepStatus = null!;
     private Button btnSalvar = null!, btnCancelar = null!;
+    private bool _buscandoCep;
 
     public ClienteForm(ClienteService service, Cliente? cliente)
     {
@@ -27,7 +31,7 @@ public class ClienteForm : Form
     {
         Text = _cliente is null ? "Novo Cliente" : "Editar Cliente";
         StartPosition = FormStartPosition.CenterParent;
-        ClientSize = new Size(480, 620);
+        ClientSize = new Size(500, 700);
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = false;
@@ -75,8 +79,14 @@ public class ClienteForm : Form
         txtCpf = UITheme.CriarTextBox("Somente números");
         txtTelefone = UITheme.CriarTextBox("(00) 00000-0000");
         txtEmail = UITheme.CriarTextBox("email@exemplo.com");
-        txtEndereco = UITheme.CriarTextBox("Rua, número, bairro, cidade...");
-        foreach (var t in new[] { txtNome, txtCpf, txtTelefone, txtEmail, txtEndereco })
+
+        txtCep = UITheme.CriarTextBox("Somente números — preenche a rua automaticamente");
+        txtCep.Leave += async (_, _) => await BuscarCepAsync();
+
+        txtRua = UITheme.CriarTextBox("Rua / Logradouro (preenchido pelo CEP)");
+        txtComplemento = UITheme.CriarTextBox("Apto, bloco, casa... (opcional)");
+
+        foreach (var t in new[] { txtNome, txtCpf, txtTelefone, txtEmail, txtCep, txtRua, txtComplemento })
             t.Dock = DockStyle.Fill;
 
         dtpNascimento = new DateTimePicker
@@ -97,6 +107,13 @@ public class ClienteForm : Form
         };
         chkSemNascimento.CheckedChanged += (_, _) => dtpNascimento.Enabled = !chkSemNascimento.Checked;
 
+        lblCepStatus = new Label
+        {
+            Font = UITheme.FontPequena,
+            ForeColor = UITheme.TextMuted,
+            Dock = DockStyle.Fill
+        };
+
         Linha(Rotulo("Nome *"), txtNome);
         Linha(Rotulo("CPF *"), txtCpf);
         Linha(Rotulo("Telefone"), txtTelefone);
@@ -106,7 +123,13 @@ public class ClienteForm : Form
         tabela.RowStyles.Add(new RowStyle(SizeType.Absolute, 26f));
         tabela.Controls.Add(chkSemNascimento);
 
-        Linha(Rotulo("Endereço"), txtEndereco, 32f);
+        Linha(Rotulo("CEP (busca a rua sozinho)"), txtCep);
+
+        tabela.RowStyles.Add(new RowStyle(SizeType.Absolute, 20f));
+        tabela.Controls.Add(lblCepStatus);
+
+        Linha(Rotulo("Rua"), txtRua);
+        Linha(Rotulo("Complemento (opcional)"), txtComplemento);
 
         // Espaço flexível + linha de botões (sempre visível)
         tabela.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
@@ -138,13 +161,55 @@ public class ClienteForm : Form
         CancelButton = btnCancelar;
     }
 
+    private async Task BuscarCepAsync()
+    {
+        var cep = ValidationHelper.SomenteNumeros(txtCep.Text);
+        if (cep.Length != 8 || _buscandoCep) return;
+
+        _buscandoCep = true;
+        lblCepStatus.ForeColor = UITheme.TextMuted;
+        lblCepStatus.Text = "🔎 Buscando endereço pelo CEP...";
+        try
+        {
+            var endereco = await _cepService.BuscarAsync(cep);
+            if (endereco is null)
+            {
+                lblCepStatus.ForeColor = UITheme.Danger;
+                lblCepStatus.Text = "⚠ CEP não encontrado. Digite a rua manualmente.";
+                return;
+            }
+
+            var partes = new[] { endereco.Logradouro, endereco.Bairro, endereco.Localidade,
+                                 endereco.Uf }.Where(p => !string.IsNullOrWhiteSpace(p));
+            txtRua.Text = string.Join(", ", partes);
+            if (!string.IsNullOrWhiteSpace(endereco.Complemento) && string.IsNullOrWhiteSpace(txtComplemento.Text))
+                txtComplemento.Text = endereco.Complemento;
+
+            lblCepStatus.ForeColor = UITheme.Success;
+            lblCepStatus.Text = "✅ Endereço encontrado. Confira o número/complemento.";
+        }
+        catch (Exception ex)
+        {
+            // Sem internet ou API indisponível: não bloqueia o cadastro.
+            lblCepStatus.ForeColor = UITheme.Warning;
+            lblCepStatus.Text = "⚠ Não foi possível consultar o CEP. Digite a rua manualmente.";
+            System.Diagnostics.Debug.WriteLine("Erro ViaCEP: " + ex);
+        }
+        finally
+        {
+            _buscandoCep = false;
+        }
+    }
+
     private void Preencher(Cliente c)
     {
         txtNome.Text = c.NomeCompleto;
         txtCpf.Text = c.CPF;
         txtTelefone.Text = c.Telefone ?? "";
         txtEmail.Text = c.Email ?? "";
-        txtEndereco.Text = c.Endereco ?? "";
+        txtCep.Text = c.CEP ?? "";
+        txtRua.Text = c.Endereco ?? "";
+        txtComplemento.Text = c.Complemento ?? "";
         if (c.DataNascimento.HasValue) dtpNascimento.Value = c.DataNascimento.Value;
         else chkSemNascimento.Checked = true;
     }
@@ -153,12 +218,21 @@ public class ClienteForm : Form
     {
         try
         {
+            var cepDigitos = ValidationHelper.SomenteNumeros(txtCep.Text);
+            if (!string.IsNullOrEmpty(cepDigitos) && cepDigitos.Length != 8)
+            {
+                ErrorHelper.ShowWarning("CEP inválido. Digite os 8 números ou deixe em branco.", this);
+                return;
+            }
+
             var cliente = _cliente ?? new Cliente();
             cliente.NomeCompleto = txtNome.Text.Trim();
             cliente.CPF = txtCpf.Text.Trim();
             cliente.Telefone = string.IsNullOrWhiteSpace(txtTelefone.Text) ? null : txtTelefone.Text.Trim();
             cliente.Email = string.IsNullOrWhiteSpace(txtEmail.Text) ? null : txtEmail.Text.Trim();
-            cliente.Endereco = string.IsNullOrWhiteSpace(txtEndereco.Text) ? null : txtEndereco.Text.Trim();
+            cliente.CEP = string.IsNullOrEmpty(cepDigitos) ? null : cepDigitos;
+            cliente.Endereco = string.IsNullOrWhiteSpace(txtRua.Text) ? null : txtRua.Text.Trim();
+            cliente.Complemento = string.IsNullOrWhiteSpace(txtComplemento.Text) ? null : txtComplemento.Text.Trim();
             cliente.DataNascimento = chkSemNascimento.Checked ? null : dtpNascimento.Value.Date;
 
             if (_cliente is null)

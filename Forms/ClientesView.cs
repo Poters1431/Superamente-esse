@@ -13,6 +13,11 @@ public class ClientesView : UserControl
     private Button btnNovo = null!, btnEditar = null!, btnDesativar = null!, btnBuscar = null!;
 
     private ClienteService _service = null!;
+    private PagamentoService _pagService = null!;
+
+    // Painel financeiro do cliente selecionado
+    private Label lblFinNome = null!, lblFinTotal = null!, lblFinPago = null!,
+                  lblFinRestante = null!, lblFinParcelas = null!, lblFinStatus = null!;
 
     public ClientesView()
     {
@@ -76,14 +81,74 @@ public class ClientesView : UserControl
         grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Nascimento", HeaderText = "Nascimento", FillWeight = 60 });
         grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Status", HeaderText = "Status", FillWeight = 45 });
         grid.CellDoubleClick += (_, _) => EditarSelecionado();
+        grid.SelectionChanged += (_, _) => AtualizarPainelFinanceiro();
+
+        // ---------- Painel financeiro (Total a pagar × Pago × Restante) ----------
+        var painelFin = UITheme.CriarCard();
+        painelFin.Dock = DockStyle.Bottom;
+        painelFin.Height = 96;
+        painelFin.Padding = new Padding(16, 12, 16, 12);
+
+        var finLayout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 6,
+            RowCount = 1
+        };
+        finLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 24f));
+        for (int i = 0; i < 5; i++)
+            finLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 15.2f));
+
+        (Label titulo, Label valor) Bloco(string tituloTxt, Color cor)
+        {
+            var p = new Panel { Dock = DockStyle.Fill };
+            var lt = new Label
+            {
+                Text = tituloTxt,
+                Font = UITheme.FontPequena,
+                ForeColor = UITheme.TextMuted,
+                Dock = DockStyle.Top,
+                Height = 20
+            };
+            var lv = new Label
+            {
+                Text = "—",
+                Font = new Font("Segoe UI", 13f, FontStyle.Bold),
+                ForeColor = cor,
+                Dock = DockStyle.Fill
+            };
+            p.Controls.Add(lv);
+            p.Controls.Add(lt);
+            return (lt, lv);
+        }
+
+        var bNome = Bloco("Cliente selecionado", UITheme.Primary);
+        var bTotal = Bloco("💰 Total a pagar", UITheme.Text);
+        var bPago = Bloco("✅ Total pago", UITheme.Success);
+        var bRestante = Bloco("⏳ Restante", UITheme.Warning);
+        var bParcelas = Bloco("Parcelas (pagas/total)", UITheme.Text);
+        var bStatus = Bloco("Situação", UITheme.PrimaryDark);
+
+        lblFinNome = bNome.valor;
+        lblFinTotal = bTotal.valor;
+        lblFinPago = bPago.valor;
+        lblFinRestante = bRestante.valor;
+        lblFinParcelas = bParcelas.valor;
+        lblFinStatus = bStatus.valor;
+
+        foreach (var (t, _) in new[] { bNome, bTotal, bPago, bRestante, bParcelas, bStatus })
+            finLayout.Controls.Add(t.Parent!);
+
+        painelFin.Controls.Add(finLayout);
 
         var cardGrid = UITheme.CriarCard();
         cardGrid.Dock = DockStyle.Fill;
         cardGrid.Controls.Add(grid);
 
         Controls.Add(cardGrid);
-        Controls.Add(toolbar);
-        Controls.Add(lblTitulo);
+        Controls.Add(painelFin);   // Bottom
+        Controls.Add(toolbar);     // Top
+        Controls.Add(lblTitulo);   // Top (docked primeiro)
     }
 
     private void PosicionarToolbar(Panel toolbar)
@@ -101,8 +166,12 @@ public class ClientesView : UserControl
         try
         {
             var db = new DatabaseConnection(Program.ConnectionString);
-            _service = new ClienteService(new ClienteRepository(db));
+            var clienteRepo = new ClienteRepository(db);
+            _service = new ClienteService(clienteRepo);
+            _pagService = new PagamentoService(
+                new PagamentoRepository(db), clienteRepo, new FormaPagamentoRepository(db));
             CarregarGrid();
+            AtualizarPainelFinanceiro();
         }
         catch (Exception ex)
         {
@@ -153,6 +222,43 @@ public class ClientesView : UserControl
         using var form = new ClienteForm(_service, cliente);
         if (form.ShowDialog(this) == DialogResult.OK)
             CarregarGrid();
+    }
+
+    private void AtualizarPainelFinanceiro()
+    {
+        if (lblFinNome is null) return;
+        var cliente = Selecionado();
+        if (cliente is null || _pagService is null)
+        {
+            lblFinNome.Text = "—";
+            lblFinTotal.Text = "—";
+            lblFinPago.Text = "—";
+            lblFinRestante.Text = "—";
+            lblFinParcelas.Text = "—";
+            lblFinStatus.Text = "—";
+            return;
+        }
+        try
+        {
+            var r = _pagService.ObterResumoCliente(cliente.Id);
+            lblFinNome.Text = cliente.NomeCompleto;
+            lblFinTotal.Text = r.ValorTotal.ToString("C2");
+            lblFinPago.Text = r.TotalPago.ToString("C2");
+            lblFinRestante.Text = r.ValorRestante.ToString("C2");
+            lblFinParcelas.Text = $"{r.ParcelasPagas}/{r.QuantidadeParcelas}";
+            lblFinStatus.Text = r.Status;
+            lblFinStatus.ForeColor = r.Status switch
+            {
+                "Quitado" => UITheme.Success,
+                "Parcialmente pago" => UITheme.Warning,
+                "Em aberto" => UITheme.Danger,
+                _ => UITheme.TextMuted
+            };
+        }
+        catch (Exception ex)
+        {
+            ErrorHelper.ShowWarning("Não foi possível calcular o resumo financeiro: " + ex.Message, this);
+        }
     }
 
     private void DesativarSelecionado()

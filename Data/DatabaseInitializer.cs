@@ -69,16 +69,24 @@ begin
     join sys.columns c on c.object_id = dc.parent_object_id and c.column_id = dc.parent_column_id
     join sys.tables t on t.object_id = c.object_id
     where t.name = 'Clientes'
-      and c.name not in ('Id','NomeCompleto','CPF','Telefone','Email','DataNascimento','Endereco','Ativo');
+      and c.name not in ('Id','NomeCompleto','CPF','Telefone','Email','DataNascimento','CEP','Endereco','Complemento','Ativo');
     exec(@cons);
 
     declare @cols nvarchar(max) = '';
     select @cols += 'alter table Clientes drop column ' + quotename(c.name) + ';'
     from sys.columns c join sys.tables t on t.object_id = c.object_id
     where t.name = 'Clientes'
-      and c.name not in ('Id','NomeCompleto','CPF','Telefone','Email','DataNascimento','Endereco','Ativo')
+      and c.name not in ('Id','NomeCompleto','CPF','Telefone','Email','DataNascimento','CEP','Endereco','Complemento','Ativo')
       and c.is_identity = 0;
     exec(@cols);
+
+    -- garante colunas novas em bancos já existentes
+    if not exists (select * from sys.columns c join sys.tables t on t.object_id = c.object_id
+                   where t.name = 'Clientes' and c.name = 'CEP')
+        alter table Clientes add CEP varchar(9) null;
+    if not exists (select * from sys.columns c join sys.tables t on t.object_id = c.object_id
+                   where t.name = 'Clientes' and c.name = 'Complemento')
+        alter table Clientes add Complemento nvarchar(150) null;
 end;";
 
         using var cmd = new SqlCommand(sql, cn);
@@ -114,7 +122,9 @@ BEGIN
         Telefone VARCHAR(20) NULL,
         Email NVARCHAR(150) NULL,
         DataNascimento DATE NULL,
+        CEP VARCHAR(9) NULL,
         Endereco NVARCHAR(250) NULL,
+        Complemento NVARCHAR(150) NULL,
         Ativo BIT NOT NULL DEFAULT 1,
         CONSTRAINT UQ_Clientes_CPF UNIQUE (CPF)
     );

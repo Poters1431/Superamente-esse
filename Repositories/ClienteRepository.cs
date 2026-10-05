@@ -8,6 +8,9 @@ public class ClienteRepository
 {
     private readonly IDatabaseConnection _db;
 
+    private const string Colunas =
+        "Id, NomeCompleto, CPF, Telefone, Email, DataNascimento, CEP, Endereco, Complemento, Ativo";
+
     public ClienteRepository(IDatabaseConnection db) => _db = db;
 
     public List<Cliente> Listar(string? filtro = null, bool somenteAtivos = false)
@@ -16,8 +19,7 @@ public class ClienteRepository
         using var cn = _db.CreateConnection();
         cn.Open();
 
-        var sql = @"SELECT Id, NomeCompleto, CPF, Telefone, Email, DataNascimento, Endereco, Ativo
-                    FROM Clientes WHERE 1=1";
+        var sql = $"SELECT {Colunas} FROM Clientes WHERE 1=1";
         if (somenteAtivos) sql += " AND Ativo = 1";
         if (!string.IsNullOrWhiteSpace(filtro))
             sql += " AND (NomeCompleto LIKE @Filtro OR CPF LIKE @Filtro OR Email LIKE @Filtro)";
@@ -36,8 +38,7 @@ public class ClienteRepository
     {
         using var cn = _db.CreateConnection();
         cn.Open();
-        const string sql = @"SELECT Id, NomeCompleto, CPF, Telefone, Email, DataNascimento, Endereco, Ativo
-                             FROM Clientes WHERE Id = @Id;";
+        var sql = $"SELECT {Colunas} FROM Clientes WHERE Id = @Id;";
         using var cmd = new SqlCommand(sql, cn);
         cmd.Parameters.AddWithValue("@Id", id);
         using var rd = cmd.ExecuteReader();
@@ -60,8 +61,8 @@ public class ClienteRepository
         using var cn = _db.CreateConnection();
         cn.Open();
         const string sql = @"
-            INSERT INTO Clientes (NomeCompleto, CPF, Telefone, Email, DataNascimento, Endereco, Ativo)
-            VALUES (@Nome, @CPF, @Telefone, @Email, @DataNascimento, @Endereco, 1);
+            INSERT INTO Clientes (NomeCompleto, CPF, Telefone, Email, DataNascimento, CEP, Endereco, Complemento, Ativo)
+            VALUES (@Nome, @CPF, @Telefone, @Email, @DataNascimento, @CEP, @Endereco, @Complemento, 1);
             SELECT CAST(SCOPE_IDENTITY() AS INT);";
         using var cmd = new SqlCommand(sql, cn);
         PreencherParametros(cmd, c);
@@ -74,7 +75,8 @@ public class ClienteRepository
         cn.Open();
         const string sql = @"
             UPDATE Clientes SET NomeCompleto = @Nome, CPF = @CPF, Telefone = @Telefone,
-                Email = @Email, DataNascimento = @DataNascimento, Endereco = @Endereco
+                Email = @Email, DataNascimento = @DataNascimento,
+                CEP = @CEP, Endereco = @Endereco, Complemento = @Complemento
             WHERE Id = @Id;";
         using var cmd = new SqlCommand(sql, cn);
         PreencherParametros(cmd, c);
@@ -108,7 +110,9 @@ public class ClienteRepository
         cmd.Parameters.AddWithValue("@Telefone", (object?)c.Telefone ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@Email", (object?)c.Email ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@DataNascimento", (object?)c.DataNascimento ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@CEP", (object?)c.CEP ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@Endereco", (object?)c.Endereco ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@Complemento", (object?)c.Complemento ?? DBNull.Value);
     }
 
     private static Cliente Map(SqlDataReader rd) => new()
@@ -119,7 +123,9 @@ public class ClienteRepository
         Telefone = rd.IsDBNull(3) ? null : rd.GetString(3),
         Email = rd.IsDBNull(4) ? null : rd.GetString(4),
         DataNascimento = rd.IsDBNull(5) ? null : rd.GetDateTime(5),
-        Endereco = rd.IsDBNull(6) ? null : rd.GetString(6),
-        Ativo = rd.GetBoolean(7)
+        CEP = rd.IsDBNull(6) ? null : rd.GetString(6),
+        Endereco = rd.IsDBNull(7) ? null : rd.GetString(7),
+        Complemento = rd.IsDBNull(8) ? null : rd.GetString(8),
+        Ativo = rd.GetBoolean(9)
     };
 }
