@@ -108,6 +108,25 @@ public class MainForm : Form
         };
         sidebar.Controls.Add(btnTema);
 
+        // Botão de backup do banco (.bak)
+        var btnBackup = new Button
+        {
+            Text = "💾  Backup do banco",
+            Font = UITheme.FontNormal,
+            ForeColor = Color.White,
+            BackColor = UITheme.Sidebar,
+            FlatStyle = FlatStyle.Flat,
+            Dock = DockStyle.Bottom,
+            Height = 44,
+            TextAlign = ContentAlignment.MiddleLeft,
+            Padding = new Padding(18, 0, 0, 0),
+            Cursor = Cursors.Hand
+        };
+        btnBackup.FlatAppearance.BorderSize = 0;
+        btnBackup.FlatAppearance.MouseOverBackColor = UITheme.SidebarHover;
+        btnBackup.Click += (_, _) => FazerBackup();
+        sidebar.Controls.Add(btnBackup);
+
         // ---------- Conteúdo ----------
         pnlConteudo = new Panel
         {
@@ -143,6 +162,30 @@ public class MainForm : Form
         }
 
         MostrarView(item);
+    }
+
+    /// <summary>Gera um backup .bak do banco na pasta que o usuário escolher.</summary>
+    private void FazerBackup()
+    {
+        using var dlg = new FolderBrowserDialog
+        {
+            Description = "Escolha a pasta onde será salvo o backup (.bak) do banco de dados",
+            UseDescriptionForTitle = true
+        };
+        if (dlg.ShowDialog(this) != DialogResult.OK) return;
+        try
+        {
+            Cursor = Cursors.WaitCursor;
+            var arquivo = Services.BackupService.RealizarBackup(dlg.SelectedPath);
+            ErrorHelper.ShowSuccess($"Backup criado com sucesso!\n\n{arquivo}", this);
+        }
+        catch (Exception ex)
+        {
+            ErrorHelper.ShowError(
+                "Não foi possível fazer o backup.\n\nDica: escolha uma pasta simples " +
+                "(ex.: Documentos) — o SQL Server precisa de permissão de escrita nela.", ex, this);
+        }
+        finally { Cursor = Cursors.Default; }
     }
 
     private void MostrarView(string item)
