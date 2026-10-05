@@ -10,17 +10,20 @@ public class ClientesView : UserControl
 {
     private DataGridView grid = null!;
     private TextBox txtBusca = null!;
-    private Button btnNovo = null!, btnEditar = null!, btnDesativar = null!, btnBuscar = null!;
+    private Button btnNovo = null!, btnEditar = null!, btnDesativar = null!, btnBuscar = null!, btnDescontar = null!, btnReativar = null!;
 
     private ClienteService _service = null!;
     private PagamentoService _pagService = null!;
+    private FormaPagamentoRepository _formaRepo = null!;
+    private readonly Usuario _usuario;
 
     // Painel financeiro do cliente selecionado
     private Label lblFinNome = null!, lblFinTotal = null!, lblFinPago = null!,
                   lblFinRestante = null!, lblFinParcelas = null!, lblFinStatus = null!;
 
-    public ClientesView()
+    public ClientesView(Usuario usuario)
     {
+        _usuario = usuario;
         ConstruirInterface();
         Load += (_, _) => Inicializar();
     }
@@ -62,11 +65,21 @@ public class ClientesView : UserControl
         btnDesativar.Width = 110;
         btnDesativar.Click += (_, _) => DesativarSelecionado();
 
+        btnReativar = UITheme.CriarBotao("♻ Reativar", UITheme.Warning);
+        btnReativar.Width = 110;
+        btnReativar.Click += (_, _) => ReativarSelecionado();
+
+        btnDescontar = UITheme.CriarBotao("💸 Descontar", UITheme.Success);
+        btnDescontar.Width = 120;
+        btnDescontar.Click += (_, _) => DescontarDoSelecionado();
+
         toolbar.Controls.Add(txtBusca);
         toolbar.Controls.Add(btnBuscar);
         toolbar.Controls.Add(btnNovo);
         toolbar.Controls.Add(btnEditar);
         toolbar.Controls.Add(btnDesativar);
+        toolbar.Controls.Add(btnReativar);
+        toolbar.Controls.Add(btnDescontar);
         toolbar.Resize += (_, _) => PosicionarToolbar(toolbar);
         PosicionarToolbar(toolbar);
 
@@ -81,7 +94,11 @@ public class ClientesView : UserControl
         grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Nascimento", HeaderText = "Nascimento", FillWeight = 60 });
         grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Status", HeaderText = "Status", FillWeight = 45 });
         grid.CellDoubleClick += (_, _) => EditarSelecionado();
-        grid.SelectionChanged += (_, _) => AtualizarPainelFinanceiro();
+        grid.SelectionChanged += (_, _) =>
+        {
+            AtualizarPainelFinanceiro();
+            AtualizarEstadoBotoes();
+        };
 
         // ---------- Painel financeiro (Total a pagar × Pago × Restante) ----------
         var painelFin = UITheme.CriarCard();
@@ -154,7 +171,7 @@ public class ClientesView : UserControl
     private void PosicionarToolbar(Panel toolbar)
     {
         int x = 0;
-        foreach (Control c in new Control[] { txtBusca, btnBuscar, btnNovo, btnEditar, btnDesativar })
+        foreach (Control c in new Control[] { txtBusca, btnBuscar, btnNovo, btnEditar, btnDescontar, btnDesativar, btnReativar })
         {
             c.Location = new Point(x, (toolbar.Height - c.Height) / 2);
             x += c.Width + 10;
@@ -168,8 +185,9 @@ public class ClientesView : UserControl
             var db = new DatabaseConnection(Program.ConnectionString);
             var clienteRepo = new ClienteRepository(db);
             _service = new ClienteService(clienteRepo);
+            _formaRepo = new FormaPagamentoRepository(db);
             _pagService = new PagamentoService(
-                new PagamentoRepository(db), clienteRepo, new FormaPagamentoRepository(db));
+                new PagamentoRepository(db), clienteRepo, _formaRepo);
             CarregarGrid();
             AtualizarPainelFinanceiro();
         }
@@ -258,6 +276,87 @@ public class ClientesView : UserControl
         catch (Exception ex)
         {
             ErrorHelper.ShowWarning("Não foi possível calcular o resumo financeiro: " + ex.Message, this);
+        }
+    }
+
+    /// <summary>
+    /// Habilita/desabilita os botões conforme o cliente selecionado:
+    /// Desativar só para clientes ativos, Reativar só para inativos.
+    /// </summary>
+    private void AtualizarEstadoBotoes()
+    {
+        var cliente = Selecionado();
+        btnDesativar.Enabled = cliente is not null && cliente.Ativo;
+        btnReativar.Enabled = cliente is not null && !cliente.Ativo;
+    }
+
+    /// <summary>
+    /// Baixa rápida: informa o valor recebido e a forma de pagamento,
+    /// descontando direto do restante do cliente sem abrir o formulário completo.
+    /// </summary>
+    private void DescontarDoSelecionado()
+    {
+        var cliente = Selecionado();
+        if (cliente is null)
+        {
+            ErrorHelper.ShowWarning("Selecione um cliente na lista para descontar um valor.", this);
+            return;
+        }
+        if (!cliente.Ativo)
+        {
+            ErrorHelper.ShowWarning("Este cliente está inativo. Reative-o antes de descontar valores.", this);
+            return;
+        }
+        try
+        {
+            var resumo = _pagService.ObterResumoCliente(cliente.Id);
+            var formas = _formaRepo.Listar(true);
+            if (formas.Count == 0)
+            {
+                ErrorHelper.ShowWarning("Nenhuma forma de pagamento ativa. Cadastre uma antes de descontar.", this);
+                return;
+            }
+
+            using var form = new DescontarPagamentoForm(_pagService, cliente, _usuario,
+                resumo.ValorRestante, formas);
+            if (form.ShowDialog(this) == DialogResult.OK)
+            {
+                CarregarGrid();
+                AtualizarPainelFinanceiro();
+                ErrorHelper.ShowSuccess("Valor descontado com sucesso.", this);
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorHelper.ShowError("Erro ao descontar o valor do cliente.", ex, this);
+        }
+    }
+
+    private void ReativarSelecionado()
+    {
+        var cliente = Selecionado();
+        if (cliente is null)
+        {
+            ErrorHelper.ShowWarning("Selecione um cliente na lista.", this);
+            return;
+        }
+        if (cliente.Ativo)
+        {
+            ErrorHelper.ShowWarning("Este cliente já está ativo.", this);
+            return;
+        }
+        if (MessageBox.Show(this, $"Reativar o cliente '{cliente.NomeCompleto}'?",
+                "Confirmar", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+            return;
+        try
+        {
+            _service.Reativar(cliente.Id);
+            ErrorHelper.ShowSuccess("Cliente reativado com sucesso.", this);
+            CarregarGrid();
+        }
+        catch (Exception ex)
+        {
+            ErrorHelper.ShowError("Erro ao reativar o cliente.", ex, this);
         }
     }
 

@@ -2,6 +2,9 @@ namespace ClientePagamentoSystem.Models;
 
 public class Pagamento
 {
+    /// <summary>Prefixo usado na observação para marcar uma baixa rápida (Descontar).</summary>
+    public const string BaixaRapidaPrefixo = "[BAIXA]";
+
     public int Id { get; set; }
     public int ClienteId { get; set; }
     public decimal Valor { get; set; }

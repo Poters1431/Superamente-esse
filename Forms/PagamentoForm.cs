@@ -20,7 +20,9 @@ public class PagamentoForm : Form
     private Button btnSalvar = null!, btnCancelar = null!;
 
     public PagamentoForm(PagamentoService service, Usuario usuario,
-        List<Cliente> clientes, List<FormaPagamento> formas, Pagamento? pagamento)
+        List<Cliente> clientes, List<FormaPagamento> formas, Pagamento? pagamento,
+        int? clientePreselecionadoId = null, decimal? valorSugerido = null,
+        string? observacaoSugerida = null, bool jaPago = false)
     {
         _service = service;
         _usuario = usuario;
@@ -28,6 +30,23 @@ public class PagamentoForm : Form
 
         ConstruirInterface(clientes, formas);
         if (pagamento is not null) Preencher(pagamento);
+        else
+        {
+            if (clientePreselecionadoId.HasValue)
+                for (int i = 0; i < cmbCliente.Items.Count; i++)
+                    if (cmbCliente.Items[i] is Cliente c && c.Id == clientePreselecionadoId.Value)
+                    { cmbCliente.SelectedIndex = i; break; }
+            if (valorSugerido.HasValue)
+                txtValor.Text = valorSugerido.Value.ToString("F2", CultureInfo.GetCultureInfo("pt-BR"));
+            if (!string.IsNullOrWhiteSpace(observacaoSugerida))
+                txtObservacao.Text = observacaoSugerida;
+            if (jaPago)
+            {
+                cmbStatus.SelectedItem = "Pago";
+                chkPago.Checked = true;
+                dtpPagamento.Value = DateTime.Today;
+            }
+        }
     }
 
     private void ConstruirInterface(List<Cliente> clientes, List<FormaPagamento> formas)

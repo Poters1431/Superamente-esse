@@ -32,6 +32,8 @@ public class ClienteService
 
     public void Desativar(int id) => _repo.Desativar(id);
 
+    public void Reativar(int id) => _repo.Reativar(id);
+
     public int ContarAtivos() => _repo.Contar(true);
 
     private void Validar(Cliente c, int ignorarId)

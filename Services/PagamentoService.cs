@@ -54,16 +54,31 @@ public class PagamentoService
 
     public DashboardResumo ObterResumo() => _repo.ObterResumo();
 
+    /// <summary>
+    /// Identifica baixas rápidas (Descontar): esses valores são pagamentos
+    /// avulsos e NÃO entram no "Total a pagar" do cliente; eles reduzem o restante.
+    /// </summary>
+    private static bool EhBaixaRapida(Pagamento p)
+    {
+        var obs = p.Observacao ?? "";
+        return obs.StartsWith(Pagamento.BaixaRapidaPrefixo, StringComparison.OrdinalIgnoreCase)
+            || obs.StartsWith("Baixa rápida", StringComparison.OrdinalIgnoreCase); // registros antigos
+    }
+
     public ResumoFinanceiroCliente ObterResumoCliente(int clienteId)
     {
         var pagamentos = _repo.Listar(clienteId: clienteId);
+        var baixas = pagamentos.Where(EhBaixaRapida).ToList();
+        var parcelas = pagamentos.Where(p => !EhBaixaRapida(p)).ToList();
+        decimal totalDescontado = baixas.Sum(p => p.Valor);
+
         return new ResumoFinanceiroCliente
         {
-            ValorTotal = pagamentos.Sum(p => p.Valor),
-            QuantidadeParcelas = pagamentos.Count,
-            ParcelasPagas = pagamentos.Count(p => p.Status == "Pago"),
+            ValorTotal = parcelas.Sum(p => p.Valor),
+            QuantidadeParcelas = parcelas.Count,
+            ParcelasPagas = parcelas.Count(p => p.Status == "Pago"),
             TotalPago = pagamentos.Where(p => p.Status == "Pago").Sum(p => p.Valor),
-            ValorRestante = pagamentos.Where(p => p.Status != "Pago").Sum(p => p.Valor)
+            ValorRestante = Math.Max(0m, parcelas.Where(p => p.Status != "Pago").Sum(p => p.Valor) - totalDescontado)
         };
     }
 
