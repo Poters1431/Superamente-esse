@@ -5,10 +5,10 @@ using Microsoft.Extensions.Configuration;
 
 namespace ClientePagamentoSystem;
 
-internal static class Program
+public static class Program
 {
-    public static IConfiguration Configuration { get; private set; } = null!;
-    public static string ConnectionString { get; private set; } = string.Empty;
+    public static IConfiguration Configuration { get; set; } = null!;
+    public static string ConnectionString { get; set; } = string.Empty;
 
     [STAThread]
     static void Main()

@@ -38,7 +38,9 @@ BEGIN
         Telefone VARCHAR(20) NULL,
         Email NVARCHAR(150) NULL,
         DataNascimento DATE NULL,
+        CEP VARCHAR(9) NULL,
         Endereco NVARCHAR(250) NULL,
+        Complemento NVARCHAR(150) NULL,
         Ativo BIT NOT NULL DEFAULT 1,
         CONSTRAINT UQ_Clientes_CPF UNIQUE (CPF)
     );
