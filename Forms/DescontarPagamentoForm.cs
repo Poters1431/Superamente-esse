@@ -21,6 +21,7 @@ public class DescontarPagamentoForm : Form
     private TextBox txtValor = null!;
     private ComboBox cmbForma = null!;
     private TextBox txtObservacao = null!;
+    private DateTimePicker dtpPagamento = null!;
 
     public DescontarPagamentoForm(PagamentoService pagService, Cliente cliente,
         Usuario usuario, decimal valorRestante, List<FormaPagamento> formas)
@@ -41,7 +42,7 @@ public class DescontarPagamentoForm : Form
         MaximizeBox = false;
         MinimizeBox = false;
         BackColor = UITheme.Card;
-        ClientSize = new Size(400, 340);
+        ClientSize = new Size(400, 400);
 
         var lblTitulo = UITheme.CriarLabel("💸 Descontar do cliente", bold: true);
         lblTitulo.SetBounds(20, 16, 360, 24);
@@ -69,24 +70,36 @@ public class DescontarPagamentoForm : Form
         foreach (var f in _formas) cmbForma.Items.Add(f);
         if (cmbForma.Items.Count > 0) cmbForma.SelectedIndex = 0;
 
+        var lblDataPgto = UITheme.CriarLabel("Data em que o cliente pagou:");
+        lblDataPgto.SetBounds(20, 224, 360, 20);
+
+        dtpPagamento = new DateTimePicker
+        {
+            Font = UITheme.FontNormal,
+            Format = DateTimePickerFormat.Short,
+            Value = DateTime.Today
+        };
+        dtpPagamento.SetBounds(20, 246, 360, 28);
+
         var lblObs = UITheme.CriarLabel("Observação (opcional):");
-        lblObs.SetBounds(20, 224, 360, 20);
+        lblObs.SetBounds(20, 284, 360, 20);
 
         txtObservacao = UITheme.CriarTextBox();
-        txtObservacao.SetBounds(20, 246, 360, 28);
+        txtObservacao.SetBounds(20, 306, 360, 28);
 
         var btnConfirmar = UITheme.CriarBotao("✔ Confirmar baixa", UITheme.Success);
-        btnConfirmar.SetBounds(20, 288, 220, 38);
+        btnConfirmar.SetBounds(20, 346, 220, 38);
         btnConfirmar.Click += BtnConfirmar_Click;
 
         var btnCancelar = UITheme.CriarBotao("Cancelar", null, true);
-        btnCancelar.SetBounds(248, 288, 132, 38);
+        btnCancelar.SetBounds(248, 346, 132, 38);
         btnCancelar.Click += (_, _) => { DialogResult = DialogResult.Cancel; Close(); };
 
         Controls.AddRange(new Control[]
         {
             lblTitulo, lblCliente, lblRestante, lblValor, txtValor,
-            lblForma, cmbForma, lblObs, txtObservacao, btnConfirmar, btnCancelar
+            lblForma, cmbForma, lblDataPgto, dtpPagamento,
+            lblObs, txtObservacao, btnConfirmar, btnCancelar
         });
 
         AcceptButton = btnConfirmar;
@@ -116,6 +129,7 @@ public class DescontarPagamentoForm : Form
                 ClienteId = _cliente.Id,
                 Valor = valor,
                 DataVencimento = DateTime.Today,
+                DataPagamento = dtpPagamento.Value,
                 Status = "Pago",
                 FormaPagamentoId = forma.Id,
                 Observacao = string.IsNullOrWhiteSpace(txtObservacao.Text)

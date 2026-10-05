@@ -1,5 +1,6 @@
 using System.Globalization;
 using ClientePagamentoSystem.Helpers;
+using System.Text;
 using ClientePagamentoSystem.Models;
 using ClientePagamentoSystem.Services;
 
@@ -18,6 +19,24 @@ public class PagamentoForm : Form
     private CheckBox chkPago = null!;
     private Label lblResumoCliente = null!;
     private Button btnSalvar = null!, btnCancelar = null!;
+
+    // ---- Parcelamento no crédito ----
+    private const int MaxParcelas = 20;
+    private ComboBox cmbParcelas = null!;
+    private NumericUpDown numSemJuros = null!;
+    private TextBox txtJuros = null!;
+    private Label lblSimulacao = null!;
+    private Label lblRotuloCredito = null!;
+    private Panel painelCredito = null!;
+
+    /// <summary>Detecta forma de pagamento "crédito" (ignora acentos e maiúsculas).</summary>
+    private static bool EhCredito(FormaPagamento? f)
+    {
+        if (f is null) return false;
+        var n = f.Nome.Normalize(NormalizationForm.FormD);
+        n = new string(n.Where(ch => CharUnicodeInfo.GetUnicodeCategory(ch) != UnicodeCategory.NonSpacingMark).ToArray());
+        return n.Contains("credito", StringComparison.OrdinalIgnoreCase);
+    }
 
     public PagamentoForm(PagamentoService service, Usuario usuario,
         List<Cliente> clientes, List<FormaPagamento> formas, Pagamento? pagamento,
@@ -53,7 +72,7 @@ public class PagamentoForm : Form
     {
         Text = _pagamento is null ? "Registrar Pagamento" : "Editar Pagamento";
         StartPosition = FormStartPosition.CenterParent;
-        ClientSize = new Size(500, 700);
+        ClientSize = new Size(500, 810);
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = false;
@@ -118,6 +137,7 @@ public class PagamentoForm : Form
         txtValor = UITheme.CriarTextBox("0,00");
         txtValor.TextAlign = HorizontalAlignment.Right;
         txtValor.Dock = DockStyle.Fill;
+        txtValor.TextChanged += (_, _) => AtualizarSimulacao();
         Linha(Rotulo("Valor (R$) *"), txtValor);
 
         // Vencimento
@@ -167,7 +187,78 @@ public class PagamentoForm : Form
         cmbForma = UITheme.CriarComboBox();
         cmbForma.DataSource = formas;
         cmbForma.Dock = DockStyle.Fill;
+        cmbForma.SelectedIndexChanged += (_, _) => AtualizarPainelCredito();
         Linha(Rotulo("Forma de pagamento *"), cmbForma);
+
+        // ---------- Parcelamento no crédito (visível só para "crédito") ----------
+        painelCredito = new Panel { Dock = DockStyle.Fill, Visible = false };
+
+        var lblCredroTitulo = UITheme.CriarLabel("💳 Parcelamento no crédito", bold: true);
+        lblCredroTitulo.SetBounds(0, 2, 300, 20);
+
+        var lblParcSel = UITheme.CriarLabel("Parcelas:");
+        lblParcSel.SetBounds(0, 26, 62, 22);
+
+        cmbParcelas = new ComboBox
+        {
+            Font = UITheme.FontNormal,
+            DropDownStyle = ComboBoxStyle.DropDownList
+        };
+        cmbParcelas.SetBounds(64, 22, 92, 28);
+        for (int i = 1; i <= MaxParcelas; i++)
+            cmbParcelas.Items.Add(i == 1 ? "1x à vista" : $"{i}x");
+        cmbParcelas.SelectedIndex = 0;
+        cmbParcelas.SelectedIndexChanged += (_, _) =>
+        {
+            int p = ParcelasSelecionadas();
+            int sem = Math.Min((int)numSemJuros.Value, p);
+            numSemJuros.Maximum = p;
+            numSemJuros.Value = sem;
+            AtualizarSimulacao();
+        };
+
+        var lblSemJuros = UITheme.CriarLabel("Sem juros até:");
+        lblSemJuros.SetBounds(164, 26, 94, 22);
+
+        numSemJuros = new NumericUpDown
+        {
+            Font = UITheme.FontNormal,
+            Minimum = 0,
+            Maximum = MaxParcelas,
+            Value = 0,
+            TextAlign = HorizontalAlignment.Center
+        };
+        numSemJuros.SetBounds(260, 22, 52, 28);
+        numSemJuros.ValueChanged += (_, _) => AtualizarSimulacao();
+
+        var lblJuros = UITheme.CriarLabel("Juros (% a.m.):");
+        lblJuros.SetBounds(320, 26, 94, 22);
+
+        txtJuros = UITheme.CriarTextBox("0");
+        txtJuros.TextAlign = HorizontalAlignment.Right;
+        txtJuros.SetBounds(416, 22, 52, 28);
+        txtJuros.TextChanged += (_, _) => AtualizarSimulacao();
+
+        lblSimulacao = new Label
+        {
+            Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
+            ForeColor = UITheme.Primary,
+            Bounds = new Rectangle(0, 58, 468, 40),
+            TextAlign = ContentAlignment.MiddleLeft
+        };
+
+        painelCredito.Controls.AddRange(new Control[]
+        {
+            lblCredroTitulo, lblParcSel, cmbParcelas, lblSemJuros, numSemJuros,
+            lblJuros, txtJuros, lblSimulacao
+        });
+
+        lblRotuloCredito = Rotulo("Parcelas / juros (crédito)");
+        lblRotuloCredito.Visible = false;
+        tabela.RowStyles.Add(new RowStyle(SizeType.Absolute, 20f));
+        tabela.Controls.Add(lblRotuloCredito);
+        tabela.RowStyles.Add(new RowStyle(SizeType.Absolute, 104f));
+        tabela.Controls.Add(painelCredito);
 
         // Observação
         txtObservacao = UITheme.CriarTextBox("Observações (opcional)");
@@ -207,6 +298,64 @@ public class PagamentoForm : Form
 
         AtualizarDataPagamento();
         AtualizarResumoCliente();
+        AtualizarPainelCredito();
+    }
+
+    private int ParcelasSelecionadas()
+    {
+        if (cmbParcelas.SelectedIndex >= 0) return cmbParcelas.SelectedIndex + 1;
+        return 1;
+    }
+
+    private void AtualizarPainelCredito()
+    {
+        bool credito = _pagamento is null && EhCredito(cmbForma.SelectedItem as FormaPagamento);
+        painelCredito.Visible = credito;
+        lblRotuloCredito.Visible = credito;
+        if (credito) AtualizarSimulacao();
+    }
+
+    /// <summary>
+    /// Calcula e exibe automaticamente o total com juros e o valor de cada
+    /// parcela conforme o valor, número de parcelas, carência sem juros e taxa.
+    /// Juros compostos aplicados apenas quando parcelas > "sem juros até".
+    /// </summary>
+    private void AtualizarSimulacao()
+    {
+        if (painelCredito is null || !painelCredito.Visible) return;
+        var cultura = CultureInfo.GetCultureInfo("pt-BR");
+
+        if (!decimal.TryParse(txtValor.Text.Replace("R$", "").Trim(),
+                NumberStyles.Currency, cultura, out var valor) || valor <= 0)
+        {
+            lblSimulacao.Text = "Informe o valor para simular o parcelamento.";
+            lblSimulacao.ForeColor = UITheme.TextMuted;
+            return;
+        }
+
+        int parcelas = ParcelasSelecionadas();
+        int semJuros = Math.Min((int)numSemJuros.Value, parcelas);
+        decimal taxa = 0m;
+        decimal.TryParse(txtJuros.Text.Replace("%", "").Trim(),
+            NumberStyles.Number, cultura, out taxa);
+
+        decimal total = valor;
+        bool comJuros = parcelas > semJuros && taxa > 0;
+        if (comJuros)
+        {
+            int periodos = parcelas - semJuros;
+            total = valor * (decimal)Math.Pow(1 + (double)taxa / 100.0, periodos);
+            total = Math.Round(total, 2);
+        }
+
+        decimal valorParcela = Math.Round(total / parcelas, 2);
+        lblSimulacao.ForeColor = comJuros ? UITheme.Danger : UITheme.Primary;
+        lblSimulacao.Text = parcelas <= 1
+            ? $"💳 Pagamento à vista: {valor.ToString("C2", cultura)}"
+            : comJuros
+                ? $"💳 Total: {total.ToString("C2", cultura)}, em {parcelas}x de {valorParcela.ToString("C2", cultura)} " +
+                  $"(juros de {taxa.ToString("N2", cultura)}% a.m. após {semJuros}x)"
+                : $"💳 Total: {total.ToString("C2", cultura)}, em {parcelas}x de {valorParcela.ToString("C2", cultura)} sem juros";
     }
 
     private void AtualizarDataPagamento()
@@ -257,6 +406,55 @@ public class PagamentoForm : Form
             if (cmbForma.Items[i] is FormaPagamento f && f.Id == p.FormaPagamentoId) { cmbForma.SelectedIndex = i; break; }
     }
 
+    /// <summary>
+    /// Gera N pagamentos mensais (parcelas) para compra no crédito,
+    /// aplicando juros compostos quando passa da carência "sem juros até".
+    /// A última parcela ajusta os centavos para o total fechar exato.
+    /// </summary>
+    private void RegistrarParcelamento(Cliente cliente, FormaPagamento forma, decimal valor, int parcelas)
+    {
+        var cultura = CultureInfo.GetCultureInfo("pt-BR");
+        int semJuros = Math.Min((int)numSemJuros.Value, parcelas);
+        decimal.TryParse(txtJuros.Text.Replace("%", "").Trim(),
+            NumberStyles.Number, cultura, out decimal taxa);
+
+        decimal total = valor;
+        if (parcelas > semJuros && taxa > 0)
+            total = Math.Round(valor * (decimal)Math.Pow(1 + (double)taxa / 100.0, parcelas - semJuros), 2);
+
+        decimal baseParcela = Math.Round(total / parcelas, 2);
+        string status = cmbStatus.SelectedItem?.ToString() ?? "Pendente";
+        DateTime? dataPagamento = chkPago.Checked && dtpPagamento.Enabled
+            ? dtpPagamento.Value
+            : status == "Pago" ? DateTime.Now : null;
+        string baseObs = string.IsNullOrWhiteSpace(txtObservacao.Text)
+            ? "" : txtObservacao.Text.Trim() + " ";
+
+        decimal acumulado = 0m;
+        for (int i = 1; i <= parcelas; i++)
+        {
+            decimal v = i == parcelas ? total - acumulado : baseParcela;
+            acumulado += v;
+            _service.Registrar(new Pagamento
+            {
+                ClienteId = cliente.Id,
+                Valor = v,
+                DataVencimento = dtpVencimento.Value.Date.AddMonths(i - 1),
+                Status = status,
+                FormaPagamentoId = forma.Id,
+                Observacao = $"{baseObs}(Parcela {i}/{parcelas})".Trim(),
+                UsuarioId = _usuario.Id,
+                DataPagamento = dataPagamento
+            });
+        }
+
+        ErrorHelper.ShowSuccess(
+            $"Parcelamento registrado: {parcelas}x de {(Math.Round(total / parcelas, 2)).ToString("C2", cultura)} " +
+            $"— total {total.ToString("C2", cultura)}.", this);
+        DialogResult = DialogResult.OK;
+        Close();
+    }
+
     private void BtnSalvar_Click(object? sender, EventArgs e)
     {
         try
@@ -275,6 +473,14 @@ public class PagamentoForm : Form
                     NumberStyles.Currency, CultureInfo.GetCultureInfo("pt-BR"), out var valor))
             {
                 ErrorHelper.ShowWarning("Valor inválido. Exemplo: 150,00", this);
+                return;
+            }
+
+            // Parcelamento no crédito: gera N pagamentos mensais de uma vez
+            int parcelas = painelCredito.Visible ? ParcelasSelecionadas() : 1;
+            if (_pagamento is null && parcelas > 1)
+            {
+                RegistrarParcelamento(cliente, forma, valor, parcelas);
                 return;
             }
 
@@ -303,6 +509,10 @@ public class PagamentoForm : Form
 
             DialogResult = DialogResult.OK;
             Close();
+        }
+        catch (ArgumentNullException ex)
+        {
+            ErrorHelper.ShowWarning(ex.Message, this);
         }
         catch (ArgumentException ex)
         {

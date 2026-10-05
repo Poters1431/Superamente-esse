@@ -55,7 +55,8 @@ public class DashboardView : UserControl
             };
 
             flow.Controls.Add(CriarCard("👥", "Total de Clientes", totalClientes.ToString(), UITheme.Primary));
-            flow.Controls.Add(CriarCard("💰", "Total de Pagamentos", resumo.TotalPagamentos.ToString(), UITheme.PrimaryDark));
+            flow.Controls.Add(CriarCard("💰", "Registros de Pagamento", resumo.TotalPagamentos.ToString(), UITheme.PrimaryDark));
+            flow.Controls.Add(CriarCard("🧾", "Valor Total Cobrado", (resumo.ValorRecebido + resumo.ValorPendente).ToString("C2"), UITheme.PrimaryDark));
             flow.Controls.Add(CriarCard("✅", "Pagamentos Pagos", resumo.Pagos.ToString(), UITheme.Success));
             flow.Controls.Add(CriarCard("⏳", "Pendentes", resumo.Pendentes.ToString(), UITheme.Warning));
             flow.Controls.Add(CriarCard("⚠", "Atrasados", resumo.Atrasados.ToString(), UITheme.Danger));

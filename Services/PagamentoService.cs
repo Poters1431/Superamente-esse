@@ -19,10 +19,15 @@ public class PagamentoService
 
     public static readonly string[] StatusValidos = { "Pendente", "Pago", "Atrasado" };
 
+    /// <summary>
+    /// somenteClientesAtivos: true esconde o histórico de clientes desativados.
+    /// </summary>
     public List<Pagamento> Listar(string? filtro = null, int? clienteId = null,
-        string? status = null, int? formaPagamentoId = null)
+        string? status = null, int? formaPagamentoId = null,
+        bool somenteClientesAtivos = true)
     {
-        var lista = _repo.Listar(filtro, clienteId, status, formaPagamentoId);
+        var lista = _repo.Listar(filtro, clienteId, status, formaPagamentoId,
+            somenteClientesAtivos: somenteClientesAtivos);
         // Atualiza automaticamente para 'Atrasado' o que está pendente e vencido
         foreach (var p in lista)
         {
@@ -67,7 +72,8 @@ public class PagamentoService
 
     public ResumoFinanceiroCliente ObterResumoCliente(int clienteId)
     {
-        var pagamentos = _repo.Listar(clienteId: clienteId);
+        // Resumo individual: inclui histórico mesmo se o cliente estiver inativo
+        var pagamentos = _repo.Listar(clienteId: clienteId, somenteClientesAtivos: false);
         var baixas = pagamentos.Where(EhBaixaRapida).ToList();
         var parcelas = pagamentos.Where(p => !EhBaixaRapida(p)).ToList();
         decimal totalDescontado = baixas.Sum(p => p.Valor);

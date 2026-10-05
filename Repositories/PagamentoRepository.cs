@@ -19,8 +19,13 @@ public class PagamentoRepository
         INNER JOIN FormasPagamento f ON f.Id = p.FormaPagamentoId
         INNER JOIN Usuarios u ON u.Id = p.UsuarioId";
 
+    /// <summary>
+    /// somenteClientesAtivos: quando true, esconde o histórico de pagamentos
+    /// de clientes desativados (os registros voltam ao reativar o cliente).
+    /// </summary>
     public List<Pagamento> Listar(string? filtro = null, int? clienteId = null,
-        string? status = null, int? formaPagamentoId = null, bool incluirInativos = false)
+        string? status = null, int? formaPagamentoId = null, bool incluirInativos = false,
+        bool somenteClientesAtivos = true)
     {
         var lista = new List<Pagamento>();
         using var cn = _db.CreateConnection();
@@ -28,12 +33,13 @@ public class PagamentoRepository
 
         var sql = SelectBase + " WHERE 1=1";
         if (!incluirInativos) sql += " AND p.Ativo = 1";
+        if (somenteClientesAtivos) sql += " AND c.Ativo = 1";
         if (clienteId.HasValue) sql += " AND p.ClienteId = @ClienteId";
         if (!string.IsNullOrWhiteSpace(status)) sql += " AND p.Status = @Status";
         if (formaPagamentoId.HasValue) sql += " AND p.FormaPagamentoId = @FormaPagamentoId";
         if (!string.IsNullOrWhiteSpace(filtro))
             sql += " AND (c.NomeCompleto LIKE @Filtro OR p.Observacao LIKE @Filtro)";
-        sql += " ORDER BY p.DataVencimento DESC, p.Id DESC;";
+        sql += " ORDER BY p.DataVencimento ASC, p.Id ASC;";
 
         using var cmd = new SqlCommand(sql, cn);
         if (clienteId.HasValue) cmd.Parameters.AddWithValue("@ClienteId", clienteId.Value);
@@ -106,12 +112,14 @@ public class PagamentoRepository
         const string sql = @"
             SELECT
                 COUNT(1),
-                SUM(CASE WHEN Status = 'Pago' THEN 1 ELSE 0 END),
-                SUM(CASE WHEN Status = 'Pendente' THEN 1 ELSE 0 END),
-                SUM(CASE WHEN Status = 'Atrasado' THEN 1 ELSE 0 END),
-                ISNULL(SUM(CASE WHEN Status = 'Pago' THEN Valor ELSE 0 END), 0),
-                ISNULL(SUM(CASE WHEN Status <> 'Pago' THEN Valor ELSE 0 END), 0)
-            FROM Pagamentos WHERE Ativo = 1;";
+                SUM(CASE WHEN p.Status = 'Pago' THEN 1 ELSE 0 END),
+                SUM(CASE WHEN p.Status = 'Pendente' THEN 1 ELSE 0 END),
+                SUM(CASE WHEN p.Status = 'Atrasado' THEN 1 ELSE 0 END),
+                ISNULL(SUM(CASE WHEN p.Status = 'Pago' THEN p.Valor ELSE 0 END), 0),
+                ISNULL(SUM(CASE WHEN p.Status <> 'Pago' THEN p.Valor ELSE 0 END), 0)
+            FROM Pagamentos p
+            INNER JOIN Clientes c ON c.Id = p.ClienteId
+            WHERE p.Ativo = 1 AND c.Ativo = 1;";
         using var cmd = new SqlCommand(sql, cn);
         using var rd = cmd.ExecuteReader();
         if (!rd.Read()) return new DashboardResumo();

@@ -84,7 +84,11 @@ public static class UITheme
         grid.DefaultCellStyle.SelectionForeColor = Text;
         grid.DefaultCellStyle.Padding = new Padding(8, 0, 0, 0);
         grid.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(248, 250, 252);
-        grid.RowTemplate.Height = 32;
+        grid.CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal;
+        grid.DefaultCellStyle.SelectionForeColor = PrimaryDark;
+        grid.DefaultCellStyle.SelectionBackColor = Color.FromArgb(219, 234, 254);
+        grid.RowTemplate.Height = 36;
+        grid.RowTemplate.DividerHeight = 1;
         grid.RowHeadersVisible = false;
         grid.AllowUserToAddRows = false;
         grid.AllowUserToResizeRows = false;

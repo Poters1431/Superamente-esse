@@ -39,8 +39,13 @@ public class PagamentosView : UserControl
             Height = 50
         };
 
-        // ---------- Filtros ----------
-        var filtros = new Panel { Dock = DockStyle.Top, Height = 96, BackColor = UITheme.Background };
+        // ---------- Filtros (dentro de um card branco) ----------
+        var cardFiltros = UITheme.CriarCard();
+        cardFiltros.Dock = DockStyle.Top;
+        cardFiltros.Height = 120;
+        cardFiltros.Padding = new Padding(14, 12, 14, 12);
+
+        var filtros = new Panel { Dock = DockStyle.Fill, BackColor = UITheme.Card };
 
         txtBusca = UITheme.CriarTextBox("Pesquisar por cliente ou observação...");
         txtBusca.SetBounds(0, 8, 280, 30);
@@ -87,20 +92,25 @@ public class PagamentosView : UserControl
         btnExcluir.SetBounds(300, 50, 100, 36);
         btnExcluir.Click += (_, _) => ExcluirSelecionado();
 
+        var btnDescontar = UITheme.CriarBotao("💸 Descontar", UITheme.Success);
+        btnDescontar.SetBounds(410, 50, 130, 36);
+        btnDescontar.Click += (_, _) => DescontarDoSelecionado();
+
         lblResumo = new Label
         {
             Font = UITheme.FontPequena,
             ForeColor = UITheme.TextMuted,
             AutoSize = false,
-            Bounds = new Rectangle(420, 50, 650, 36),
+            Bounds = new Rectangle(550, 50, 520, 36),
             TextAlign = ContentAlignment.MiddleRight
         };
 
         filtros.Controls.AddRange(new Control[]
         {
             txtBusca, cmbFiltroCliente, cmbFiltroStatus, cmbFiltroForma,
-            btnBuscar, btnLimpar, btnNovo, btnEditar, btnExcluir, lblResumo
+            btnBuscar, btnLimpar, btnNovo, btnEditar, btnExcluir, btnDescontar, lblResumo
         });
+        cardFiltros.Controls.Add(filtros);
 
         // ---------- Grid ----------
         grid = new DataGridView { Dock = DockStyle.Fill };
@@ -109,6 +119,7 @@ public class PagamentosView : UserControl
         grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Cliente", HeaderText = "Cliente", FillWeight = 120 });
         grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Valor", HeaderText = "Valor", FillWeight = 65 });
         grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Vencimento", HeaderText = "Vencimento", FillWeight = 62 });
+        foreach (DataGridViewColumn col in grid.Columns) col.SortMode = DataGridViewColumnSortMode.Automatic;
         grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Pagamento", HeaderText = "Pagamento", FillWeight = 62 });
         grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Forma", HeaderText = "Forma de Pagamento", FillWeight = 90 });
         grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Status", HeaderText = "Status", FillWeight = 55 });
@@ -121,7 +132,7 @@ public class PagamentosView : UserControl
         cardGrid.Controls.Add(grid);
 
         Controls.Add(cardGrid);
-        Controls.Add(filtros);
+        Controls.Add(cardFiltros);
         Controls.Add(lblTitulo);
     }
 
@@ -180,7 +191,6 @@ public class PagamentosView : UserControl
             int? formaId = cmbFiltroForma.SelectedItem is FormaPagamento f ? f.Id : null;
 
             var pagamentos = _service.Listar(txtBusca.Text.Trim(), clienteId, status, formaId);
-
             grid.Rows.Clear();
             foreach (var p in pagamentos)
             {
@@ -247,6 +257,54 @@ public class PagamentosView : UserControl
             cmbFiltroCliente.Items.Cast<object>().OfType<Cliente>().Any(x => x.Id == sc.Id)
             ? cmbFiltroCliente.Items.IndexOf(cmbFiltroCliente.Items.Cast<object>().OfType<Cliente>().First(x => x.Id == sc.Id))
             : 0;
+    }
+
+    /// <summary>
+    /// Baixa rápida: desconta um valor do restante do cliente do pagamento
+    /// selecionado, sem abrir o formulário completo.
+    /// </summary>
+    private void DescontarDoSelecionado()
+    {
+        var pagamento = Selecionado();
+        if (pagamento is null)
+        {
+            ErrorHelper.ShowWarning("Selecione um pagamento na lista para descontar um valor.", this);
+            return;
+        }
+        try
+        {
+            var cliente = _clienteService.ObterPorId(pagamento.ClienteId);
+            if (cliente is null)
+            {
+                ErrorHelper.ShowWarning("Cliente não encontrado.", this);
+                return;
+            }
+            if (!cliente.Ativo)
+            {
+                ErrorHelper.ShowWarning("Este cliente está inativo. Reative-o antes de descontar valores.", this);
+                return;
+            }
+
+            var resumo = _service.ObterResumoCliente(cliente.Id);
+            var formas = _formaRepo.Listar(true);
+            if (formas.Count == 0)
+            {
+                ErrorHelper.ShowWarning("Nenhuma forma de pagamento ativa. Cadastre uma antes de descontar.", this);
+                return;
+            }
+
+            using var form = new DescontarPagamentoForm(_service, cliente, _usuario,
+                resumo.ValorRestante, formas);
+            if (form.ShowDialog(this) == DialogResult.OK)
+            {
+                CarregarGrid();
+                ErrorHelper.ShowSuccess("Valor descontado com sucesso.", this);
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorHelper.ShowError("Erro ao descontar o valor do cliente.", ex, this);
+        }
     }
 
     private void ExcluirSelecionado()
