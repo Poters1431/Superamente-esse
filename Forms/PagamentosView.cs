@@ -1,4 +1,5 @@
 using ClientePagamentoSystem.Data;
+using System.Globalization;
 using ClientePagamentoSystem.Helpers;
 using ClientePagamentoSystem.Models;
 using ClientePagamentoSystem.Repositories;
@@ -103,19 +104,28 @@ public class PagamentosView : UserControl
         btnDescontar.SetBounds(410, 50, 130, 36);
         btnDescontar.Click += (_, _) => DescontarDoSelecionado();
 
+        var btnCobrar = UITheme.CriarBotao("📱 Cobrar", UITheme.Warning);
+        btnCobrar.SetBounds(550, 50, 110, 36);
+        btnCobrar.Click += (_, _) => CobrarPorWhatsApp();
+
+        var btnPix = UITheme.CriarBotao("💠 Pix", UITheme.PrimaryDark);
+        btnPix.SetBounds(670, 50, 100, 36);
+        btnPix.Click += (_, _) => GerarPixDoSelecionado();
+
         lblResumo = new Label
         {
             Font = UITheme.FontPequena,
             ForeColor = UITheme.TextMuted,
             AutoSize = false,
-            Bounds = new Rectangle(550, 50, 520, 36),
+            Bounds = new Rectangle(780, 50, 290, 36),
             TextAlign = ContentAlignment.MiddleRight
         };
 
         filtros.Controls.AddRange(new Control[]
         {
             txtBusca, cmbFiltroCliente, cmbFiltroStatus, cmbFiltroForma,
-            btnBuscar, btnLimpar, btnNovo, btnEditar, btnExcluir, btnDescontar, lblResumo
+            btnBuscar, btnLimpar, btnNovo, btnEditar, btnExcluir, btnDescontar,
+            btnCobrar, btnPix, lblResumo
         });
         cardFiltros.Controls.Add(filtros);
 
@@ -346,6 +356,61 @@ public class PagamentosView : UserControl
         {
             ErrorHelper.ShowError("Erro ao descontar o valor do cliente.", ex, this);
         }
+    }
+
+    /// <summary>
+    /// Abre o WhatsApp do cliente com mensagem de cobrança pronta
+    /// (valor e vencimento da parcela selecionada).
+    /// </summary>
+    private void CobrarPorWhatsApp()
+    {
+        var pagamento = Selecionado();
+        if (pagamento is null)
+        {
+            ErrorHelper.ShowWarning("Selecione uma parcela na lista para cobrar.", this);
+            return;
+        }
+        try
+        {
+            var cliente = _clienteService.ObterPorId(pagamento.ClienteId);
+            var fone = new string((cliente?.Telefone ?? "").Where(char.IsDigit).ToArray());
+            if (fone.Length < 10)
+            {
+                ErrorHelper.ShowWarning(
+                    "Este cliente não tem telefone válido cadastrado (precisa de DDD + número).", this);
+                return;
+            }
+            if (fone.Length <= 11) fone = "55" + fone; // DDI Brasil
+
+            var cultura = CultureInfo.GetCultureInfo("pt-BR");
+            string situacao = pagamento.Status == "Atrasado" ? "está em atraso" : "vence";
+            var msg = $"Olá {cliente!.NomeCompleto.Split(' ')[0]}, tudo bem? " +
+                      $"Passando para lembrar que sua parcela de {pagamento.Valor.ToString("C2", cultura)} " +
+                      $"{situacao} dia {pagamento.DataVencimento:dd/MM/yyyy}. " +
+                      $"Qualquer dúvida estou à disposição!";
+
+            var url = $"https://wa.me/{fone}?text={Uri.EscapeDataString(msg)}";
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url)
+            { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            ErrorHelper.ShowError("Não foi possível abrir o WhatsApp.", ex, this);
+        }
+    }
+
+    /// <summary>Gera a cobrança Pix (QR Code + copia e cola) para a parcela selecionada.</summary>
+    private void GerarPixDoSelecionado()
+    {
+        var pagamento = Selecionado();
+        if (pagamento is null)
+        {
+            ErrorHelper.ShowWarning("Selecione uma parcela na lista para gerar o Pix.", this);
+            return;
+        }
+        using var form = new PixCobrancaForm(pagamento.Valor,
+            $"Cobrança — {pagamento.ClienteNome}", $"CPS{pagamento.Id}");
+        form.ShowDialog(this);
     }
 
     private void ExcluirSelecionado()
