@@ -9,6 +9,7 @@ public class MainForm : Form
     private readonly Usuario _usuarioLogado;
     private Panel pnlConteudo = null!;
     private readonly List<Button> _botoesMenu = new();
+    private string _itemAtual = "Dashboard";
 
     public MainForm(Usuario usuarioLogado)
     {
@@ -81,6 +82,32 @@ public class MainForm : Form
         };
         sidebar.Controls.Add(lblUsuario);
 
+        // Botão de alternância de tema (claro/escuro)
+        var btnTema = new Button
+        {
+            Text = UITheme.ModoEscuro ? "☀  Tema claro" : "🌙  Tema escuro",
+            Font = UITheme.FontNormal,
+            ForeColor = Color.White,
+            BackColor = UITheme.Sidebar,
+            FlatStyle = FlatStyle.Flat,
+            Dock = DockStyle.Bottom,
+            Height = 44,
+            TextAlign = ContentAlignment.MiddleLeft,
+            Padding = new Padding(18, 0, 0, 0),
+            Cursor = Cursors.Hand
+        };
+        btnTema.FlatAppearance.BorderSize = 0;
+        btnTema.FlatAppearance.MouseOverBackColor = UITheme.SidebarHover;
+        btnTema.Click += (_, _) =>
+        {
+            UITheme.AplicarTema(!UITheme.ModoEscuro);
+            Controls.Clear();
+            _botoesMenu.Clear();
+            ConstruirInterface();
+            MostrarView(_itemAtual);
+        };
+        sidebar.Controls.Add(btnTema);
+
         // ---------- Conteúdo ----------
         pnlConteudo = new Panel
         {
@@ -120,6 +147,7 @@ public class MainForm : Form
 
     private void MostrarView(string item)
     {
+        _itemAtual = item;
         foreach (var b in _botoesMenu)
             b.BackColor = (string?)b.Tag == item ? UITheme.SidebarHover : UITheme.Sidebar;
 

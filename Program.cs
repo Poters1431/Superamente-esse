@@ -29,6 +29,11 @@ public static class Program
             ConnectionString = Configuration.GetConnectionString("DefaultConnection")
                 ?? throw new InvalidOperationException(
                     "ConnectionString 'DefaultConnection' não encontrada no appsettings.json.");
+
+            // Tema salvo (claro/escuro) — aplicado antes de qualquer tela abrir
+            UITheme.AplicarTema(
+                string.Equals(Configuration["Tema"], "escuro", StringComparison.OrdinalIgnoreCase),
+                salvar: false);
         }
         catch (Exception ex)
         {

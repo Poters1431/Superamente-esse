@@ -165,7 +165,7 @@ public class DashboardView : UserControl
 
             var barra = new Panel
             {
-                BackColor = Color.FromArgb(235, 238, 244),
+                BackColor = UITheme.ChartTrack,
                 Bounds = new Rectangle(4, y, area.Width - 20, 24),
                 Anchor = AnchorStyles.Left | AnchorStyles.Top | AnchorStyles.Right
             };

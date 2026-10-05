@@ -19,6 +19,13 @@ public class PagamentosView : UserControl
     private ClienteService _clienteService = null!;
     private FormaPagamentoRepository _formaRepo = null!;
 
+    // Filtros lembrados entre trocas de aba (persistem enquanto o app está aberto)
+    private static string _filtroBuscaSalvo = "";
+    private static int _filtroStatusSalvo;
+    private static int _filtroClienteIdSalvo;
+    private static int _filtroFormaIdSalvo;
+    private bool _restaurando;
+
     public PagamentosView(Usuario usuario)
     {
         _usuario = usuario;
@@ -161,7 +168,7 @@ public class PagamentosView : UserControl
             _clienteService = new ClienteService(clienteRepo);
             _service = new PagamentoService(new PagamentoRepository(db), clienteRepo, _formaRepo);
 
-            // Combo de filtro de clientes
+                    // Combo de filtro de clientes
             cmbFiltroCliente.Items.Clear();
             cmbFiltroCliente.Items.Add("(Todos os clientes)");
             foreach (var c in _clienteService.ListarAtivos()) cmbFiltroCliente.Items.Add(c);
@@ -173,12 +180,44 @@ public class PagamentosView : UserControl
             foreach (var f in _formaRepo.Listar()) cmbFiltroForma.Items.Add(f);
             cmbFiltroForma.SelectedIndex = 0;
 
+            RestaurarFiltros();
             CarregarGrid();
         }
         catch (Exception ex)
         {
             ErrorHelper.ShowError("Não foi possível carregar os pagamentos.", ex, this);
         }
+    }
+
+    /// <summary>Reaplica os filtros que o usuário usou da última vez nesta sessão.</summary>
+    private void RestaurarFiltros()
+    {
+        _restaurando = true;
+        try
+        {
+            txtBusca.Text = _filtroBuscaSalvo;
+            cmbFiltroStatus.SelectedIndex = Math.Clamp(_filtroStatusSalvo, 0, cmbFiltroStatus.Items.Count - 1);
+
+            int idx = 0;
+            for (int i = 1; i < cmbFiltroCliente.Items.Count; i++)
+                if (cmbFiltroCliente.Items[i] is Cliente c && c.Id == _filtroClienteIdSalvo) { idx = i; break; }
+            cmbFiltroCliente.SelectedIndex = idx;
+
+            idx = 0;
+            for (int i = 1; i < cmbFiltroForma.Items.Count; i++)
+                if (cmbFiltroForma.Items[i] is FormaPagamento f && f.Id == _filtroFormaIdSalvo) { idx = i; break; }
+            cmbFiltroForma.SelectedIndex = idx;
+        }
+        finally { _restaurando = false; }
+    }
+
+    private void SalvarFiltros()
+    {
+        if (_restaurando) return;
+        _filtroBuscaSalvo = txtBusca.Text;
+        _filtroStatusSalvo = cmbFiltroStatus.SelectedIndex;
+        _filtroClienteIdSalvo = cmbFiltroCliente.SelectedItem is Cliente c ? c.Id : 0;
+        _filtroFormaIdSalvo = cmbFiltroForma.SelectedItem is FormaPagamento f ? f.Id : 0;
     }
 
     private void CarregarGrid()
@@ -189,6 +228,8 @@ public class PagamentosView : UserControl
             int? clienteId = cmbFiltroCliente.SelectedItem is Cliente c ? c.Id : null;
             string? status = cmbFiltroStatus.SelectedIndex > 0 ? cmbFiltroStatus.SelectedItem?.ToString() : null;
             int? formaId = cmbFiltroForma.SelectedItem is FormaPagamento f ? f.Id : null;
+
+            SalvarFiltros();
 
             var pagamentos = _service.Listar(txtBusca.Text.Trim(), clienteId, status, formaId);
             grid.Rows.Clear();
