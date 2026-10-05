@@ -94,6 +94,16 @@ public class ClienteRepository
         cmd.ExecuteNonQuery();
     }
 
+    public void Reativar(int id)
+    {
+        using var cn = _db.CreateConnection();
+        cn.Open();
+        const string sql = "UPDATE Clientes SET Ativo = 1 WHERE Id = @Id;";
+        using var cmd = new SqlCommand(sql, cn);
+        cmd.Parameters.AddWithValue("@Id", id);
+        cmd.ExecuteNonQuery();
+    }
+
     public int Contar(bool somenteAtivos = true)
     {
         using var cn = _db.CreateConnection();

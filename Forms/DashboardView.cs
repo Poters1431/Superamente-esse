@@ -33,8 +33,6 @@ public class DashboardView : UserControl
 
             decimal taxa = resumo.TotalPagamentos > 0
                 ? 100m * resumo.Pagos / resumo.TotalPagamentos : 0m;
-            decimal ticket = resumo.Pagos > 0 ? resumo.ValorRecebido / resumo.Pagos : 0m;
-
             var lblTitulo = new Label
             {
                 Text = "📊 Dashboard",
@@ -64,7 +62,6 @@ public class DashboardView : UserControl
             flow.Controls.Add(CriarCard("💵", "Valor Recebido", resumo.ValorRecebido.ToString("C2"), UITheme.Success));
             flow.Controls.Add(CriarCard("📄", "Valor Pendente", resumo.ValorPendente.ToString("C2"), UITheme.Warning));
             flow.Controls.Add(CriarCard("📈", "Taxa de Recebimento", taxa.ToString("F0") + "%", UITheme.Primary));
-            flow.Controls.Add(CriarCard("🎯", "Ticket Médio (pago)", ticket.ToString("C2"), UITheme.PrimaryDark));
 
             // ---------- Corpo: gráfico + próximos vencimentos ----------
             var corpo = new TableLayoutPanel

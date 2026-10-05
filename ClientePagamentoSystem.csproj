@@ -12,6 +12,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Exclui a cópia duplicada do projeto dentro da pasta ClientePagamentoSystem\ -->
+    <Compile Remove="ClientePagamentoSystem\**\*.cs" />
+    <EmbeddedResource Remove="ClientePagamentoSystem\**\*.resx" />
+    <None Remove="ClientePagamentoSystem\**\*" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
     <PackageReference Include="Microsoft.Data.SqlClient" Version="5.2.2" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.1" />
