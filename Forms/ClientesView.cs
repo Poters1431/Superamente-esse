@@ -10,17 +10,20 @@ public class ClientesView : UserControl
 {
     private DataGridView grid = null!;
     private TextBox txtBusca = null!;
-    private Button btnNovo = null!, btnEditar = null!, btnDesativar = null!, btnBuscar = null!;
+    private Button btnNovo = null!, btnEditar = null!, btnDesativar = null!, btnBuscar = null!, btnReceber = null!;
 
     private ClienteService _service = null!;
     private PagamentoService _pagService = null!;
+    private FormaPagamentoRepository _formaRepo = null!;
+    private readonly Usuario _usuario;
 
     // Painel financeiro do cliente selecionado
     private Label lblFinNome = null!, lblFinTotal = null!, lblFinPago = null!,
                   lblFinRestante = null!, lblFinParcelas = null!, lblFinStatus = null!;
 
-    public ClientesView()
+    public ClientesView(Usuario usuario)
     {
+        _usuario = usuario;
         ConstruirInterface();
         Load += (_, _) => Inicializar();
     }
@@ -62,11 +65,16 @@ public class ClientesView : UserControl
         btnDesativar.Width = 110;
         btnDesativar.Click += (_, _) => DesativarSelecionado();
 
+        btnReceber = UITheme.CriarBotao("💵 Receber", UITheme.Success);
+        btnReceber.Width = 110;
+        btnReceber.Click += (_, _) => ReceberPagamento();
+
         toolbar.Controls.Add(txtBusca);
         toolbar.Controls.Add(btnBuscar);
         toolbar.Controls.Add(btnNovo);
         toolbar.Controls.Add(btnEditar);
         toolbar.Controls.Add(btnDesativar);
+        toolbar.Controls.Add(btnReceber);
         toolbar.Resize += (_, _) => PosicionarToolbar(toolbar);
         PosicionarToolbar(toolbar);
 
@@ -154,7 +162,7 @@ public class ClientesView : UserControl
     private void PosicionarToolbar(Panel toolbar)
     {
         int x = 0;
-        foreach (Control c in new Control[] { txtBusca, btnBuscar, btnNovo, btnEditar, btnDesativar })
+        foreach (Control c in new Control[] { txtBusca, btnBuscar, btnNovo, btnEditar, btnDesativar, btnReceber })
         {
             c.Location = new Point(x, (toolbar.Height - c.Height) / 2);
             x += c.Width + 10;
@@ -168,8 +176,9 @@ public class ClientesView : UserControl
             var db = new DatabaseConnection(Program.ConnectionString);
             var clienteRepo = new ClienteRepository(db);
             _service = new ClienteService(clienteRepo);
+            _formaRepo = new FormaPagamentoRepository(db);
             _pagService = new PagamentoService(
-                new PagamentoRepository(db), clienteRepo, new FormaPagamentoRepository(db));
+                new PagamentoRepository(db), clienteRepo, _formaRepo);
             CarregarGrid();
             AtualizarPainelFinanceiro();
         }
@@ -258,6 +267,43 @@ public class ClientesView : UserControl
         catch (Exception ex)
         {
             ErrorHelper.ShowWarning("Não foi possível calcular o resumo financeiro: " + ex.Message, this);
+        }
+    }
+
+    /// <summary>
+    /// Abre o registro de pagamento já com o cliente selecionado e o valor
+    /// restante sugerido, marcando como Pago — desconta do total a pagar.
+    /// </summary>
+    private void ReceberPagamento()
+    {
+        var cliente = Selecionado();
+        if (cliente is null)
+        {
+            ErrorHelper.ShowWarning("Selecione um cliente na lista para receber um pagamento.", this);
+            return;
+        }
+        try
+        {
+            var resumo = _pagService.ObterResumoCliente(cliente.Id);
+            decimal? valorSugerido = resumo.ValorRestante > 0 ? resumo.ValorRestante : null;
+
+            var formas = _formaRepo.Listar(true);
+            var clientes = _service.ListarAtivos();
+            using var form = new PagamentoForm(_pagService, _usuario, clientes, formas, null,
+                clientePreselecionadoId: cliente.Id,
+                valorSugerido: valorSugerido,
+                observacaoSugerida: $"Recebimento de {cliente.NomeCompleto}",
+                jaPago: true);
+
+            if (form.ShowDialog(this) == DialogResult.OK)
+            {
+                CarregarGrid();
+                AtualizarPainelFinanceiro();
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorHelper.ShowError("Erro ao abrir o recebimento de pagamento.", ex, this);
         }
     }
 

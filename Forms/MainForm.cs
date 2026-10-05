@@ -129,7 +129,7 @@ public class MainForm : Form
         UserControl view = item switch
         {
             "Dashboard" => new DashboardView(),
-            "Clientes" => new ClientesView(),
+            "Clientes" => new ClientesView(_usuarioLogado),
             "Pagamentos" => new PagamentosView(_usuarioLogado),
             "Formas de Pagamento" => new FormasPagamentoView(),
             _ => new DashboardView()
