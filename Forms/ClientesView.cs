@@ -10,7 +10,7 @@ public class ClientesView : UserControl
 {
     private DataGridView grid = null!;
     private TextBox txtBusca = null!;
-    private Button btnNovo = null!, btnEditar = null!, btnDesativar = null!, btnBuscar = null!, btnReativar = null!;
+    private Button btnNovo = null!, btnEditar = null!, btnDesativar = null!, btnBuscar = null!, btnReativar = null!, btnExtrato = null!;
 
     private ClienteService _service = null!;
     private PagamentoService _pagService = null!;
@@ -75,12 +75,17 @@ public class ClientesView : UserControl
         btnReativar.Width = 110;
         btnReativar.Click += (_, _) => ReativarSelecionado();
 
+        btnExtrato = UITheme.CriarBotao("📄 Extrato", UITheme.PrimaryDark);
+        btnExtrato.Width = 110;
+        btnExtrato.Click += (_, _) => GerarExtratoDoSelecionado();
+
         toolbar.Controls.Add(txtBusca);
         toolbar.Controls.Add(btnBuscar);
         toolbar.Controls.Add(btnNovo);
         toolbar.Controls.Add(btnEditar);
         toolbar.Controls.Add(btnDesativar);
         toolbar.Controls.Add(btnReativar);
+        toolbar.Controls.Add(btnExtrato);
         toolbar.Resize += (_, _) => PosicionarToolbar(toolbar);
         PosicionarToolbar(toolbar);
         cardToolbar.Controls.Add(toolbar);
@@ -173,7 +178,7 @@ public class ClientesView : UserControl
     private void PosicionarToolbar(Panel toolbar)
     {
         int x = 0;
-        foreach (Control c in new Control[] { txtBusca, btnBuscar, btnNovo, btnEditar, btnDesativar, btnReativar })
+        foreach (Control c in new Control[] { txtBusca, btnBuscar, btnNovo, btnEditar, btnDesativar, btnReativar, btnExtrato })
         {
             c.Location = new Point(x, (toolbar.Height - c.Height) / 2);
             x += c.Width + 10;
@@ -290,6 +295,30 @@ public class ClientesView : UserControl
         var cliente = Selecionado();
         btnDesativar.Enabled = cliente is not null && cliente.Ativo;
         btnReativar.Enabled = cliente is not null && !cliente.Ativo;
+    }
+
+    /// <summary>
+    /// Gera o extrato/recibo do cliente selecionado em HTML e abre no navegador
+    /// (de lá dá para imprimir ou salvar em PDF com Ctrl+P).
+    /// </summary>
+    private void GerarExtratoDoSelecionado()
+    {
+        var cliente = Selecionado();
+        if (cliente is null)
+        {
+            ErrorHelper.ShowWarning("Selecione um cliente na lista para gerar o extrato.", this);
+            return;
+        }
+        try
+        {
+            var resumo = _pagService.ObterResumoCliente(cliente.Id);
+            var pagamentos = _pagService.Listar(clienteId: cliente.Id, somenteClientesAtivos: false);
+            ExtratoService.AbrirExtrato(cliente, resumo, pagamentos, _usuario.NomeCompleto);
+        }
+        catch (Exception ex)
+        {
+            ErrorHelper.ShowError("Erro ao gerar o extrato do cliente.", ex, this);
+        }
     }
 
     private void ReativarSelecionado()

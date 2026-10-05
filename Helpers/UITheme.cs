@@ -1,23 +1,85 @@
 using System.Drawing.Drawing2D;
+using System.Text.Json.Nodes;
 
 namespace ClientePagamentoSystem.Helpers;
 
-/// <summary>Tema visual moderno: azul primário, fundo claro, cards e cantos arredondados.</summary>
+/// <summary>Tema visual moderno: azul primário, fundo claro/escuro, cards e cantos arredondados.</summary>
 public static class UITheme
 {
-    public static readonly Color Primary = Color.FromArgb(37, 99, 235);      // azul principal
-    public static readonly Color PrimaryDark = Color.FromArgb(29, 78, 216);
-    public static readonly Color PrimaryLight = Color.FromArgb(219, 234, 254);
-    public static readonly Color Background = Color.FromArgb(243, 246, 251); // fundo claro
-    public static readonly Color Card = Color.White;
-    public static readonly Color Sidebar = Color.FromArgb(30, 58, 138);      // azul escuro
-    public static readonly Color SidebarHover = Color.FromArgb(37, 99, 235);
-    public static readonly Color Text = Color.FromArgb(31, 41, 55);
-    public static readonly Color TextMuted = Color.FromArgb(107, 114, 128);
-    public static readonly Color Success = Color.FromArgb(22, 163, 74);
-    public static readonly Color Warning = Color.FromArgb(217, 119, 6);
-    public static readonly Color Danger = Color.FromArgb(220, 38, 38);
-    public static readonly Color Border = Color.FromArgb(229, 231, 235);
+    public static Color Primary { get; private set; } = Color.FromArgb(37, 99, 235);      // azul principal
+    public static Color PrimaryDark { get; private set; } = Color.FromArgb(29, 78, 216);
+    public static Color PrimaryLight { get; private set; } = Color.FromArgb(219, 234, 254);
+    public static Color Background { get; private set; } = Color.FromArgb(243, 246, 251); // fundo claro
+    public static Color Card { get; private set; } = Color.White;
+    public static Color Sidebar { get; private set; } = Color.FromArgb(30, 58, 138);      // azul escuro
+    public static Color SidebarHover { get; private set; } = Color.FromArgb(37, 99, 235);
+    public static Color Text { get; private set; } = Color.FromArgb(31, 41, 55);
+    public static Color TextMuted { get; private set; } = Color.FromArgb(107, 114, 128);
+    public static Color Success { get; private set; } = Color.FromArgb(22, 163, 74);
+    public static Color Warning { get; private set; } = Color.FromArgb(217, 119, 6);
+    public static Color Danger { get; private set; } = Color.FromArgb(220, 38, 38);
+    public static Color Border { get; private set; } = Color.FromArgb(229, 231, 235);
+    public static Color GridAlt { get; private set; } = Color.FromArgb(248, 250, 252);    // linha alternada
+    public static Color ChartTrack { get; private set; } = Color.FromArgb(235, 238, 244); // trilha do gráfico
+
+    public static bool ModoEscuro { get; private set; }
+
+    /// <summary>Aplica o tema claro ou escuro e (opcionalmente) persiste no appsettings.json.</summary>
+    public static void AplicarTema(bool escuro, bool salvar = true)
+    {
+        ModoEscuro = escuro;
+        if (escuro)
+        {
+            Primary = Color.FromArgb(59, 130, 246);
+            PrimaryDark = Color.FromArgb(147, 197, 253);
+            PrimaryLight = Color.FromArgb(30, 64, 175);
+            Background = Color.FromArgb(15, 23, 42);   // slate-900
+            Card = Color.FromArgb(30, 41, 59);         // slate-800
+            Sidebar = Color.FromArgb(2, 6, 23);        // slate-950
+            SidebarHover = Color.FromArgb(30, 64, 175);
+            Text = Color.FromArgb(226, 232, 240);
+            TextMuted = Color.FromArgb(148, 163, 184);
+            Success = Color.FromArgb(34, 197, 94);
+            Warning = Color.FromArgb(245, 158, 11);
+            Danger = Color.FromArgb(248, 113, 113);
+            Border = Color.FromArgb(51, 65, 85);
+            GridAlt = Color.FromArgb(39, 51, 71);
+            ChartTrack = Color.FromArgb(51, 65, 85);
+        }
+        else
+        {
+            Primary = Color.FromArgb(37, 99, 235);
+            PrimaryDark = Color.FromArgb(29, 78, 216);
+            PrimaryLight = Color.FromArgb(219, 234, 254);
+            Background = Color.FromArgb(243, 246, 251);
+            Card = Color.White;
+            Sidebar = Color.FromArgb(30, 58, 138);
+            SidebarHover = Color.FromArgb(37, 99, 235);
+            Text = Color.FromArgb(31, 41, 55);
+            TextMuted = Color.FromArgb(107, 114, 128);
+            Success = Color.FromArgb(22, 163, 74);
+            Warning = Color.FromArgb(217, 119, 6);
+            Danger = Color.FromArgb(220, 38, 38);
+            Border = Color.FromArgb(229, 231, 235);
+            GridAlt = Color.FromArgb(248, 250, 252);
+            ChartTrack = Color.FromArgb(235, 238, 244);
+        }
+
+        if (salvar) SalvarTemaNoConfig();
+    }
+
+    private static void SalvarTemaNoConfig()
+    {
+        try
+        {
+            var caminho = Path.Combine(AppContext.BaseDirectory, "appsettings.json");
+            if (!File.Exists(caminho)) return;
+            var json = JsonNode.Parse(File.ReadAllText(caminho)) ?? new JsonObject();
+            json["Tema"] = ModoEscuro ? "escuro" : "claro";
+            File.WriteAllText(caminho, json.ToJsonString(new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+        }
+        catch { /* não bloquear a UI se não conseguir salvar */ }
+    }
 
     public static readonly Font FontTitulo = new("Segoe UI", 18f, FontStyle.Bold);
     public static readonly Font FontSubtitulo = new("Segoe UI", 12f, FontStyle.Bold);
@@ -34,7 +96,7 @@ public static class UITheme
             Height = 38,
             Cursor = Cursors.Hand,
             ForeColor = outline ? Primary : Color.White,
-            BackColor = outline ? Color.White : (cor ?? Primary)
+            BackColor = outline ? (ModoEscuro ? Card : Color.White) : (cor ?? Primary)
         };
         btn.FlatAppearance.BorderSize = outline ? 1 : 0;
         btn.FlatAppearance.BorderColor = Primary;
@@ -49,7 +111,7 @@ public static class UITheme
         {
             Font = FontNormal,
             BorderStyle = BorderStyle.FixedSingle,
-            BackColor = Color.White,
+            BackColor = ModoEscuro ? Color.FromArgb(15, 23, 42) : Color.White,
             ForeColor = Text,
             PlaceholderText = placeholder ?? string.Empty
         };
@@ -62,7 +124,7 @@ public static class UITheme
             Font = FontNormal,
             FlatStyle = FlatStyle.Flat,
             DropDownStyle = ComboBoxStyle.DropDownList,
-            BackColor = Color.White,
+            BackColor = ModoEscuro ? Color.FromArgb(15, 23, 42) : Color.White,
             ForeColor = Text
         };
     }
@@ -83,10 +145,10 @@ public static class UITheme
         grid.DefaultCellStyle.SelectionBackColor = PrimaryLight;
         grid.DefaultCellStyle.SelectionForeColor = Text;
         grid.DefaultCellStyle.Padding = new Padding(8, 0, 0, 0);
-        grid.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(248, 250, 252);
+        grid.AlternatingRowsDefaultCellStyle.BackColor = GridAlt;
         grid.CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal;
         grid.DefaultCellStyle.SelectionForeColor = PrimaryDark;
-        grid.DefaultCellStyle.SelectionBackColor = Color.FromArgb(219, 234, 254);
+        grid.DefaultCellStyle.SelectionBackColor = PrimaryLight;
         grid.RowTemplate.Height = 36;
         grid.RowTemplate.DividerHeight = 1;
         grid.RowHeadersVisible = false;
