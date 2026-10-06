@@ -34,13 +34,42 @@ public static class PixService
         return crc;
     }
 
+    /// <summary>
+    /// Normaliza a chave Pix conforme o tipo:
+    /// CPF/CNPJ → só dígitos; telefone → +55DDDNUMERO; e-mail/aleatória → minúscula/igual.
+    /// </summary>
+    public static string NormalizarChave(string chave)
+    {
+        chave = chave.Trim();
+        if (chave.Contains('@')) return chave.ToLowerInvariant();          // e-mail
+        if (chave.Contains('-') && chave.Length == 36) return chave.ToLowerInvariant(); // UUID/aleatória
+
+        var digitos = new string(chave.Where(char.IsDigit).ToArray());
+        if (digitos.Length is 11 or 14 && !chave.StartsWith('+'))
+            return digitos;                                                // CPF ou CNPJ
+        if (digitos.Length is 10 or 11)
+            return "+55" + digitos;                                        // telefone BR
+        if (chave.StartsWith('+') && digitos.Length is 12 or 13)
+            return "+" + digitos;                                          // telefone com DDI
+        return digitos.Length > 0 ? digitos : chave;
+    }
+
     /// <summary>Monta o payload Pix. txid deve ser alfanumérico (até 25 chars).</summary>
     public static string GerarPayload(string chave, string nome, string cidade,
         decimal valor, string txid)
     {
-        var merchantInfo = Emv("00", "br.gov.bcb.pix") + Emv("01", chave.Trim());
-        var payload = new StringBuilder()
+        chave = NormalizarChave(chave);
+
+        // txid: apenas letras e números, até 25 caracteres
+        var tx = new string(txid.Where(char.IsLetterOrDigit).ToArray());
+        if (tx.Length == 0) tx = "PAG";
+        if (tx.Length > 25) tx = tx[..25];
+
+        var merchantInfo = Emv("00", "br.gov.bcb.pix") + Emv("01", chave);
+
+        var sb = new StringBuilder()
             .Append(Emv("00", "01"))
+            .Append(Emv("01", "12"))               // QR dinâmico (valor embutido)
             .Append(Emv("26", merchantInfo))
             .Append(Emv("52", "0000"))
             .Append(Emv("53", "986"))
@@ -48,10 +77,9 @@ public static class PixService
             .Append(Emv("58", "BR"))
             .Append(Emv("59", SomenteAlfanumerico(nome, 25)))
             .Append(Emv("60", SomenteAlfanumerico(cidade, 15)))
-            .Append(Emv("62", Emv("05", txid.Length > 25 ? txid[..25] : txid)))
-            .Append("6304")
-            .ToString();
-
+            .Append(Emv("62", Emv("05", tx)))
+            .Append("6304");
+        var payload = sb.ToString();
         return payload + Crc16(payload).ToString("X4");
     }
 }
