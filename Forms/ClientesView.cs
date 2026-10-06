@@ -10,7 +10,7 @@ public class ClientesView : UserControl
 {
     private DataGridView grid = null!;
     private TextBox txtBusca = null!;
-    private Button btnNovo = null!, btnEditar = null!, btnDesativar = null!, btnBuscar = null!, btnReativar = null!, btnExtrato = null!;
+    private Button btnNovo = null!, btnEditar = null!, btnDesativar = null!, btnBuscar = null!, btnReativar = null!, btnExtrato = null!, btnEmail = null!;
 
     private ClienteService _service = null!;
     private PagamentoService _pagService = null!;
@@ -79,6 +79,10 @@ public class ClientesView : UserControl
         btnExtrato.Width = 110;
         btnExtrato.Click += (_, _) => GerarExtratoDoSelecionado();
 
+        btnEmail = UITheme.CriarBotao("✉ Enviar", UITheme.Success);
+        btnEmail.Width = 100;
+        btnEmail.Click += (_, _) => EnviarExtratoPorEmail();
+
         toolbar.Controls.Add(txtBusca);
         toolbar.Controls.Add(btnBuscar);
         toolbar.Controls.Add(btnNovo);
@@ -86,6 +90,7 @@ public class ClientesView : UserControl
         toolbar.Controls.Add(btnDesativar);
         toolbar.Controls.Add(btnReativar);
         toolbar.Controls.Add(btnExtrato);
+        toolbar.Controls.Add(btnEmail);
         toolbar.Resize += (_, _) => PosicionarToolbar(toolbar);
         PosicionarToolbar(toolbar);
         cardToolbar.Controls.Add(toolbar);
@@ -178,7 +183,7 @@ public class ClientesView : UserControl
     private void PosicionarToolbar(Panel toolbar)
     {
         int x = 0;
-        foreach (Control c in new Control[] { txtBusca, btnBuscar, btnNovo, btnEditar, btnDesativar, btnReativar, btnExtrato })
+        foreach (Control c in new Control[] { txtBusca, btnBuscar, btnNovo, btnEditar, btnDesativar, btnReativar, btnExtrato, btnEmail })
         {
             c.Location = new Point(x, (toolbar.Height - c.Height) / 2);
             x += c.Width + 10;
@@ -318,6 +323,28 @@ public class ClientesView : UserControl
         catch (Exception ex)
         {
             ErrorHelper.ShowError("Erro ao gerar o extrato do cliente.", ex, this);
+        }
+    }
+
+    /// <summary>Abre o diálogo de envio de extrato por e-mail para o cliente selecionado.</summary>
+    private void EnviarExtratoPorEmail()
+    {
+        var cliente = Selecionado();
+        if (cliente is null)
+        {
+            ErrorHelper.ShowWarning("Selecione um cliente na lista para enviar o extrato.", this);
+            return;
+        }
+        try
+        {
+            var resumo = _pagService.ObterResumoCliente(cliente.Id);
+            var pagamentos = _pagService.Listar(clienteId: cliente.Id, somenteClientesAtivos: false);
+            using var form = new EnviarExtratoForm(cliente, resumo, pagamentos, _usuario.NomeCompleto);
+            form.ShowDialog(this);
+        }
+        catch (Exception ex)
+        {
+            ErrorHelper.ShowError("Erro ao preparar o envio do extrato.", ex, this);
         }
     }
 

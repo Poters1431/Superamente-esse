@@ -47,7 +47,7 @@ public class PixCobrancaForm : Form
             cor: UITheme.TextMuted);
         lblValor.SetBounds(20, 42, 420, 20);
 
-        var lblChave = UITheme.CriarLabel("Chave Pix (CPF, e-mail, telefone ou aleatória):");
+        var lblChave = UITheme.CriarLabel("Chave Pix (CPF/CNPJ, celular, e-mail ou aleatória — pode digitar com pontos e traços):");
         lblChave.SetBounds(20, 70, 420, 20);
         txtChave = UITheme.CriarTextBox();
         txtChave.SetBounds(20, 92, 420, 28);
