@@ -163,6 +163,7 @@ public class PagamentoForm : Form
             Text = "Foi pago (informar data do pagamento)",
             Font = UITheme.FontPequena,
             ForeColor = UITheme.Text,
+            BackColor = UITheme.Card,
             Dock = DockStyle.Fill
         };
         chkPago.CheckedChanged += (_, _) =>
@@ -202,7 +203,10 @@ public class PagamentoForm : Form
         cmbParcelas = new ComboBox
         {
             Font = UITheme.FontNormal,
-            DropDownStyle = ComboBoxStyle.DropDownList
+            DropDownStyle = ComboBoxStyle.DropDownList,
+            FlatStyle = FlatStyle.Flat,
+            BackColor = UITheme.ModoEscuro ? Color.FromArgb(15, 23, 42) : Color.White,
+            ForeColor = UITheme.Text
         };
         cmbParcelas.SetBounds(64, 22, 92, 28);
         for (int i = 1; i <= MaxParcelas; i++)
@@ -226,7 +230,9 @@ public class PagamentoForm : Form
             Minimum = 0,
             Maximum = MaxParcelas,
             Value = 0,
-            TextAlign = HorizontalAlignment.Center
+            TextAlign = HorizontalAlignment.Center,
+            BackColor = UITheme.ModoEscuro ? Color.FromArgb(15, 23, 42) : Color.White,
+            ForeColor = UITheme.Text
         };
         numSemJuros.SetBounds(260, 22, 52, 28);
         numSemJuros.ValueChanged += (_, _) => AtualizarSimulacao();

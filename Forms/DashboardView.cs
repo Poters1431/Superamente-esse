@@ -147,7 +147,7 @@ public class DashboardView : UserControl
 
         int total = r.Pagos + r.Pendentes + r.Atrasados;
 
-        var area = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 20, 0, 0) };
+        var area = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 20, 0, 0), BackColor = UITheme.Card };
 
         int y = 24;
         void Linha(string legenda, int qtd, Color cor)

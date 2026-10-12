@@ -46,7 +46,11 @@ public class MainForm : Form
         };
         sidebar.Controls.Add(lblLogo);
 
-        string[] itens = { "Dashboard", "Clientes", "Pagamentos", "Formas de Pagamento", "Sair" };
+        // Funcionário não vê o Mapa Mensal — só o administrador.
+        bool adm = string.Equals(_usuarioLogado.Perfil, "adm", StringComparison.OrdinalIgnoreCase);
+        var itens = adm
+            ? new[] { "Dashboard", "Clientes", "Pagamentos", "Mapa Mensal", "Formas de Pagamento", "Sair" }
+            : new[] { "Dashboard", "Clientes", "Pagamentos", "Formas de Pagamento", "Sair" };
         for (int i = itens.Length - 1; i >= 0; i--)
         {
             var nome = itens[i];
@@ -144,6 +148,7 @@ public class MainForm : Form
         "Dashboard" => "📊",
         "Clientes" => "👥",
         "Pagamentos" => "💰",
+        "Mapa Mensal" => "📅",
         "Formas de Pagamento" => "💳",
         "Sair" => "🚪",
         _ => "•"
@@ -202,6 +207,7 @@ public class MainForm : Form
             "Dashboard" => new DashboardView(),
             "Clientes" => new ClientesView(_usuarioLogado),
             "Pagamentos" => new PagamentosView(_usuarioLogado),
+            "Mapa Mensal" => new MapaMensalView(),
             "Formas de Pagamento" => new FormasPagamentoView(),
             _ => new DashboardView()
         };

@@ -103,6 +103,7 @@ public class ClienteForm : Form
             Text = "Não informar data de nascimento",
             Font = UITheme.FontPequena,
             ForeColor = UITheme.TextMuted,
+            BackColor = UITheme.Card,
             Dock = DockStyle.Fill
         };
         chkSemNascimento.CheckedChanged += (_, _) => dtpNascimento.Enabled = !chkSemNascimento.Checked;

@@ -67,7 +67,8 @@ public class LoginForm : Form
             Font = UITheme.FontNormal,
             FlatStyle = FlatStyle.Flat,
             Bounds = new Rectangle(280, 202, 36, 30),
-            BackColor = Color.White,
+            BackColor = UITheme.ModoEscuro ? Color.FromArgb(15, 23, 42) : Color.White,
+            ForeColor = UITheme.Text,
             Cursor = Cursors.Hand
         };
         btnMostrarSenha.FlatAppearance.BorderSize = 1;

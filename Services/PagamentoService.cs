@@ -60,6 +60,32 @@ public class PagamentoService
     public DashboardResumo ObterResumo() => _repo.ObterResumo();
 
     /// <summary>
+    /// Mapa mensal (estilo caderno): para cada cliente/mês do ano, soma o que foi
+    /// PAGO (pela data de pagamento) e o que está PENDENTE/ATRASADO (pelo vencimento).
+    /// Chave da tupla: (clienteId, mes).
+    /// </summary>
+    public Dictionary<(int clienteId, int mes), (decimal pago, decimal devido)> ObterMapaMensal(int ano)
+    {
+        var mapa = new Dictionary<(int, int), (decimal pago, decimal devido)>();
+        foreach (var p in Listar(somenteClientesAtivos: true))
+        {
+            if (p.Status == "Pago" && p.DataPagamento.HasValue && p.DataPagamento.Value.Year == ano)
+            {
+                var k = (p.ClienteId, p.DataPagamento.Value.Month);
+                mapa.TryGetValue(k, out var v);
+                mapa[k] = (v.pago + p.Valor, v.devido);
+            }
+            if (p.Status != "Pago" && p.DataVencimento.Year == ano)
+            {
+                var k = (p.ClienteId, p.DataVencimento.Month);
+                mapa.TryGetValue(k, out var v);
+                mapa[k] = (v.pago, v.devido + p.Valor);
+            }
+        }
+        return mapa;
+    }
+
+    /// <summary>
     /// Identifica baixas rápidas (Descontar): esses valores são pagamentos
     /// avulsos e NÃO entram no "Total a pagar" do cliente; eles reduzem o restante.
     /// </summary>

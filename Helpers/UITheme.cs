@@ -146,6 +146,12 @@ public static class UITheme
         grid.DefaultCellStyle.SelectionForeColor = Text;
         grid.DefaultCellStyle.Padding = new Padding(8, 0, 0, 0);
         grid.AlternatingRowsDefaultCellStyle.BackColor = GridAlt;
+        grid.AlternatingRowsDefaultCellStyle.ForeColor = Text;
+        grid.DefaultCellStyle.BackColor = Card;
+        grid.RowHeadersDefaultCellStyle.BackColor = Card;
+        grid.RowHeadersDefaultCellStyle.ForeColor = TextMuted;
+        grid.RowHeadersDefaultCellStyle.SelectionBackColor = Card;
+        grid.RowHeadersDefaultCellStyle.SelectionForeColor = TextMuted;
         grid.CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal;
         grid.DefaultCellStyle.SelectionForeColor = PrimaryDark;
         grid.DefaultCellStyle.SelectionBackColor = PrimaryLight;
