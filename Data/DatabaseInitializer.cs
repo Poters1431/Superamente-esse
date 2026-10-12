@@ -20,8 +20,10 @@ public class DatabaseInitializer
         EnsureDatabase();
         EnsureSchemaCompatibility();
         EnsureTables();
+        EnsureUsuariosPerfil();
         SeedFormasPagamento();
         SeedUsuarioPadrao();
+        SeedUsuariosComPerfil();
     }
 
     private void EnsureDatabase()
@@ -89,6 +91,19 @@ begin
         alter table Clientes add Complemento nvarchar(150) null;
 end;";
 
+        using var cmd = new SqlCommand(sql, cn);
+        cmd.ExecuteNonQuery();
+    }
+
+    /// <summary>Garante que a tabela Usuarios tenha a coluna Perfil (adm/func).</summary>
+    private void EnsureUsuariosPerfil()
+    {
+        using var cn = _connection.CreateConnection();
+        cn.Open();
+        const string sql = @"
+IF NOT EXISTS (SELECT * FROM sys.columns c JOIN sys.tables t ON t.object_id = c.object_id
+               WHERE t.name = 'Usuarios' AND c.name = 'Perfil')
+    ALTER TABLE Usuarios ADD Perfil NVARCHAR(20) NOT NULL DEFAULT 'adm';";
         using var cmd = new SqlCommand(sql, cn);
         cmd.ExecuteNonQuery();
     }
@@ -197,6 +212,48 @@ END;";
             cmd.Parameters.AddWithValue("@Descricao", descricao);
             cmd.ExecuteNonQuery();
         }
+    }
+
+    /// <summary>
+    /// Cria/atualiza os usuários com perfil: Tatiane12 = adm (acessa tudo),
+    /// Larissa562 = funcionário (sem acesso ao Mapa Mensal).
+    /// Usa upsert para garantir senha e perfil mesmo em bancos antigos.
+    /// </summary>
+    private void SeedUsuariosComPerfil()
+    {
+        using var cn = _connection.CreateConnection();
+        cn.Open();
+
+        var usuarios = new (string User, string Senha, string Nome, string Perfil)[]
+        {
+            ("Tatiane12", "Tati120809", "Tatiane", "adm"),
+            ("Larissa562", "Lala3650", "Larissa", "func")
+        };
+
+        foreach (var (user, senha, nome, perfil) in usuarios)
+        {
+            string hash = BCrypt.Net.BCrypt.HashPassword(senha);
+            const string sql = @"
+                IF EXISTS (SELECT 1 FROM Usuarios WHERE Username = @U)
+                    UPDATE Usuarios SET PasswordHash = @H, Perfil = @P, Ativo = 1
+                    WHERE Username = @U;
+                ELSE
+                    INSERT INTO Usuarios (Username, PasswordHash, NomeCompleto, Email, Ativo, DataCriacao, Perfil)
+                    VALUES (@U, @H, @N, '', 1, GETDATE(), @P);";
+            using var cmd = new SqlCommand(sql, cn);
+            cmd.Parameters.AddWithValue("@U", user);
+            cmd.Parameters.AddWithValue("@H", hash);
+            cmd.Parameters.AddWithValue("@N", nome);
+            cmd.Parameters.AddWithValue("@P", perfil);
+            cmd.ExecuteNonQuery();
+        }
+
+        // Usuário antigo "Larissa" (criado na primeira versão): vira funcionário,
+        // sem acesso ao Mapa Mensal.
+        const string sqlLarissaAntiga =
+            "UPDATE Usuarios SET Perfil = 'func' WHERE Username = 'Larissa';";
+        using (var cmd = new SqlCommand(sqlLarissaAntiga, cn))
+            cmd.ExecuteNonQuery();
     }
 
     private void SeedUsuarioPadrao()

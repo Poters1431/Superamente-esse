@@ -15,7 +15,8 @@ public class UsuarioRepository
         using var cn = _db.CreateConnection();
         cn.Open();
         const string sql = @"
-            SELECT Id, Username, PasswordHash, NomeCompleto, Email, Ativo, DataCriacao, UltimoLogin
+            SELECT Id, Username, PasswordHash, NomeCompleto, Email, Ativo,
+                   ISNULL(Perfil, 'adm'), DataCriacao, UltimoLogin
             FROM Usuarios WHERE Username = @Username;";
         using var cmd = new SqlCommand(sql, cn);
         cmd.Parameters.AddWithValue("@Username", username);
@@ -30,8 +31,9 @@ public class UsuarioRepository
             NomeCompleto = rd.GetString(3),
             Email = rd.GetString(4),
             Ativo = rd.GetBoolean(5),
-            DataCriacao = rd.GetDateTime(6),
-            UltimoLogin = rd.IsDBNull(7) ? null : rd.GetDateTime(7)
+            Perfil = rd.GetString(6),
+            DataCriacao = rd.GetDateTime(7),
+            UltimoLogin = rd.IsDBNull(8) ? null : rd.GetDateTime(8)
         };
     }
 
